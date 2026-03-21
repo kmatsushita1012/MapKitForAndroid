@@ -1,0 +1,254 @@
+# Android向け MapKit JS 連携基盤 具体仕様書
+
+## 0. 前提
+
+本仕様書は [main.md](/Users/matsushitakazuya/private/MapKitForAndroid/docs/design/main.md) を具体化したものであり、各章を必ず **外部仕様(interface) -> 内部仕様** の順で記述する。
+
+---
+
+## 1. MapKit JS ドキュメントサマリ
+
+### 1.1 外部仕様(interface)
+
+#### 1.1.1 役割
+- Apple Maps を Web 上で扱うための JavaScript API。
+- `mapkit.init` で初期化し、`new mapkit.Map(...)` で地図インスタンスを生成する。
+- 表示領域、注釈(Annotation)、重ね描画(Overlay)、イベント購読を API で操作する。
+
+#### 1.1.2 本ライブラリ利用者に公開する考え方
+- Kotlin 利用者は MapKit JS の API を直接触らない。
+- 利用者は Kotlin の `MapState` と `MapEvent` を扱う。
+- 表示意図は宣言的に渡し、実描画の詳細はライブラリ内部が吸収する。
+
+#### 1.1.3 初期化で必要なもの
+- Apple Maps 利用用トークン(JWT)。
+- Android 側公開 API では `MapKitTokenProvider` 経由で供給する。
+- トークン値は環境変数由来とし、ソースに直書きしない。
+
+### 1.2 内部仕様
+
+#### 1.2.1 WebView + JS 実装方針
+- `WebView` 内で MapKit JS を読み込み、Bridge 経由で Kotlin と通信する。
+- JS 側は `MapEngine` を単一エントリにし、以下を担当する。
+- `applyMapProps`: map 基本設定反映
+- `applyRegion`: 表示領域反映
+- `applyAnnotationsDiff`: 注釈差分反映
+- `applyOverlaysDiff`: overlay 差分反映
+- `emitEvent`: Kotlin へイベント通知
+
+#### 1.2.2 トークン供給
+- Kotlin -> JS 初期化時に `authorizationCallback` へ token を橋渡し。
+- token 取得失敗時は `MapError.TokenUnavailable` を返し、地図を未初期化状態で保持。
+
+---
+
+## 2. Map 全体仕様
+
+### 2.1 外部仕様(interface)
+
+#### 2.1.1 公開コンポーネント
+- `MapKitMapView(state: MapState, onEvent: (MapEvent) -> Unit, modifier: Modifier = Modifier)`
+
+#### 2.1.2 公開データモデル
+- `MapState`
+- `region: CoordinateRegion`
+- `annotations: List<MapAnnotation>`
+- `overlays: List<MapOverlay>`
+- `options: MapOptions`
+- `interaction: MapInteraction`
+
+#### 2.1.3 公開イベント
+- `MapEvent.RegionWillChange`
+- `MapEvent.RegionDidChange`
+- `MapEvent.RegionDidChangeSettled`
+- `MapEvent.AnnotationTapped`
+- `MapEvent.OverlayTapped`
+- `MapEvent.MapLoaded`
+- `MapEvent.MapError`
+
+#### 2.1.4 動作契約
+- `state` は差分適用される(全面再生成しない)。
+- ユーザー操作中は領域を押し戻さない。
+- `onEvent` は UI 詳細ではなく意味イベントのみ通知する。
+
+### 2.2 内部仕様
+
+#### 2.2.1 層構成
+- App 層: Presenter/StateFlow/Compose
+- Bridge 層: Kotlin <-> JS 変換、差分計算、ループ抑止
+- Engine 層: WebView 上 MapKit JS
+
+#### 2.2.2 同期アルゴリズム
+- `desiredState`(Kotlin 意図) と `actualState`(Map 実状態) を分離。
+- 以下を満たすときのみ map へ反映:
+- `lastOperation == system`
+- `actual` と `desired` が許容誤差以上で異なる
+- interactive 中でない
+
+#### 2.2.3 エラー処理
+- JS 初期化失敗、token 不正、Bridge 変換失敗を `MapEvent.MapError` で返す。
+- Bridge は復旧可能エラー時に再試行(指数バックオフ)を行う。
+
+---
+
+## 3. CoordinateRegion 等の描画系仕様
+
+### 3.1 外部仕様(interface)
+
+#### 3.1.1 公開モデル
+- `CoordinateRegion`
+- `center: GeoCoordinate` (`latitude`, `longitude`)
+- `span: CoordinateSpan` (`latitudeDelta`, `longitudeDelta`)
+- `lastOperation: RegionOperation` (`interactive` | `system`)
+- `revision: Long`
+- `isSettled: Boolean`
+
+#### 3.1.2 公開操作
+- `MapCommand.SetRegion(region, animated)`
+- `MapCommand.FitBounds(points, edgePadding, animated)`
+- `MapCommand.SetCenter(center, zoomHint, animated)` (簡易操作)
+
+#### 3.1.3 公開イベント契約
+- パン/ズーム中: `RegionDidChange(isSettled=false)`
+- ジェスチャ終了後: `RegionDidChangeSettled(isSettled=true)`
+- `revision` は system 更新の自己反映識別に使う。
+
+### 3.2 内部仕様
+
+#### 3.2.1 変換
+- `CoordinateRegion` <-> MapKit JS `region` / `camera` を相互変換。
+- 比較は `epsilon` による近似比較:
+- `lat/lng`: 1e-6
+- `delta`: 1e-5
+
+#### 3.2.2 反映抑止
+- JS 反映時に `pendingRevision` を記録。
+- JS イベント受信時、同 revision かつ近似一致なら Kotlin への再反映を抑止。
+
+#### 3.2.3 settled 判定
+- `region-change-start` で `isInteracting = true`
+- `region-change-end` で `isInteracting = false`, `isSettled = true`
+- 途中イベントは throttling(例: 100ms)で Kotlin へ通知。
+
+---
+
+## 4. Annotation / Overlay 仕様
+
+### 4.1 外部仕様(interface)
+
+#### 4.1.1 Annotation
+- `MapAnnotation`
+- `id: String`
+- `coordinate: GeoCoordinate`
+- `title: String?`
+- `subtitle: String?`
+- `isVisible: Boolean`
+- `isSelected: Boolean`
+- `style: AnnotationStyle`
+
+#### 4.1.2 Overlay
+- `MapOverlay`(sealed)
+- `PolylineOverlay(id, points, style, isVisible, zIndex)`
+- `PolygonOverlay(id, points, holes, style, isVisible, zIndex)`
+- `CircleOverlay(id, center, radiusMeter, style, isVisible, zIndex)`
+
+#### 4.1.3 スタイル
+- Annotation:
+- `DefaultPin`
+- `DefaultMarker(tint, glyphText?)`
+- `Custom(key, params)`
+- Overlay:
+- `strokeColor`, `strokeWidth`, `fillColor`, `lineDashPattern`
+
+#### 4.1.4 イベント
+- `AnnotationTapped(id)`
+- `AnnotationSelected(id)`
+- `AnnotationDeselected(id)`
+- `OverlayTapped(id)`
+
+### 4.2 内部仕様
+
+#### 4.2.1 差分反映
+- `id` 単位で `add/update/remove` を計算。
+- update 判定は `hash(style + geometry + visibility + selected)` で実施。
+- map 再生成は禁止。差分命令のみ送信。
+
+#### 4.2.2 Renderer 解決
+- Annotation `style` ごとに renderer を選択:
+- default renderer
+- custom renderer registry (`key` 解決)
+- 未登録 `key` はフォールバックで `DefaultMarker`。
+
+#### 4.2.3 タップヒット処理
+- JS 側でオブジェクト `id` を保持し、イベント時に Kotlin へ返却。
+- 複数候補時は zIndex 優先で 1 件返す。
+
+---
+
+## 5. その他オプション仕様(地図スタイル等)
+
+### 5.1 外部仕様(interface)
+
+#### 5.1.1 公開オプション
+- `MapOptions`
+- `mapStyle: MapStyle` (`standard` | `mutedStandard` | `satellite` | `hybrid`)
+- `showsTraffic: Boolean`
+- `showsCompass: Boolean`
+- `showsScale: Boolean`
+- `showsPointsOfInterest: Boolean`
+- `isRotateEnabled: Boolean`
+- `isScrollEnabled: Boolean`
+- `isZoomEnabled: Boolean`
+- `isPitchEnabled: Boolean`
+- `appearance: AppearanceOption` (`auto` | `light` | `dark`)
+
+#### 5.1.2 移動モード系スタイル
+- `NavigationEmphasis` を公開:
+- `none`
+- `driving`
+- `walking`
+- `transit`
+- 本項目は「描画強調ヒント」であり、経路探索自体は責務外。
+
+#### 5.1.3 配布/設定要件
+- 利用者は環境変数で token 等を設定し、`local.properties` で参照する。
+- 機密値を VCS にコミットしない。
+- 成果物は Maven Central 公開前提。
+- リポジトリは `source/`(ライブラリ) と `example/`(デモアプリ) を分離。
+
+### 5.2 内部仕様
+
+#### 5.2.1 MapKit JS へのマッピング
+- `showsTraffic -> map.showsTraffic`
+- `mapStyle -> map.mapType` 系へ変換
+- UI 表示系(compass/scale 等)は map control 設定へ変換
+- `NavigationEmphasis` は style preset を内部マップ:
+- `driving`: 道路/ラベル強調
+- `walking`: 歩行系 POI 優先
+- `transit`: 交通網表示優先
+
+#### 5.2.2 適用順序
+- 初期化直後に `MapOptions` 一括適用。
+- 以後は変更差分のみ適用し、再初期化しない。
+
+#### 5.2.3 モジュール構成
+- `source:mapkit-android-core` (公開 API)
+- `source:mapkit-android-webview` (Bridge/Engine)
+- `source:mapkit-android-compose` (Compose ラッパ)
+- `example:demo-app` (利用例)
+
+#### 5.2.4 公開設定
+- `maven-publish` + `signing` を前提。
+- `group/artifact/version` を固定管理し、`-SNAPSHOT` と release を分離。
+
+---
+
+## 6. 初期リリース受け入れ条件
+
+- CoordinateRegion 同期でループが発生しない。
+- interactive 操作中の押し戻しが発生しない。
+- Annotation/Overlay が差分更新される。
+- Default 表示 + Custom フックが動作する。
+- Traffic / mapStyle / NavigationEmphasis が反映される。
+- token 未設定時に明示的エラーが返る。
+- `source` と `example` が分離され、example で動作確認可能。
