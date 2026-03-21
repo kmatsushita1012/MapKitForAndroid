@@ -52,7 +52,7 @@ class MKBridgeWebView @JvmOverloads constructor(
     init {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.allowFileAccess = false
+        settings.allowFileAccess = true
         settings.allowContentAccess = false
         webChromeClient = WebChromeClient()
         webViewClient = object : WebViewClient() {
@@ -64,13 +64,7 @@ class MKBridgeWebView @JvmOverloads constructor(
             }
         }
         addJavascriptInterface(androidBridge, "AndroidMKBridge")
-        loadDataWithBaseURL(
-            "https://mapkit.android.local/",
-            bridgeHtml(),
-            "text/html",
-            "utf-8",
-            null
-        )
+        loadUrl("file:///android_asset/mkbridge/index.html")
     }
 
     fun setEventListener(listener: (MKMapEvent) -> Unit) {
@@ -167,97 +161,4 @@ class MKBridgeWebView @JvmOverloads constructor(
             )
         }
     }
-
-    private fun bridgeHtml(): String = """
-        <!doctype html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <style>
-              html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; background: #f4f7fb; }
-              #map { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
-              #header { padding: 10px 12px; background: #0f172a; color: #fff; font-size: 13px; }
-              #canvas { margin: 12px; border-radius: 12px; border: 1px solid #cbd5e1; background: #e2e8f0; padding: 10px; }
-              #footer { padding: 10px 12px; display: flex; gap: 8px; }
-              button { border: none; border-radius: 8px; padding: 8px 10px; background: #0ea5e9; color: #fff; }
-              #status { font-size: 12px; color: #334155; white-space: pre-wrap; }
-            </style>
-          </head>
-          <body>
-            <div id="map">
-              <div id="header">MK Bridge WebView</div>
-              <div id="canvas">
-                <div id="status">loading...</div>
-              </div>
-              <div id="footer">
-                <button onclick="window.MKBridge.simulateAnnotationTap()">Annotation Tap</button>
-                <button onclick="window.MKBridge.simulateOverlayTap()">Overlay Tap</button>
-                <button onclick="window.MKBridge.simulatePan()">Simulate Pan</button>
-              </div>
-            </div>
-            <script>
-              (function() {
-                const state = {
-                  token: null,
-                  region: {
-                    centerLat: 35.681236,
-                    centerLng: 139.767125,
-                    latDelta: 0.05,
-                    lngDelta: 0.05
-                  },
-                  annotations: [],
-                  overlays: []
-                };
-
-                function emit(payload) {
-                  if (window.AndroidMKBridge && window.AndroidMKBridge.emitEvent) {
-                    window.AndroidMKBridge.emitEvent(JSON.stringify(payload));
-                  }
-                }
-
-                function renderStatus() {
-                  const status = document.getElementById("status");
-                  status.textContent =
-                    "center: " + state.region.centerLat.toFixed(6) + ", " + state.region.centerLng.toFixed(6) + "\n" +
-                    "span: " + state.region.latDelta.toFixed(5) + ", " + state.region.lngDelta.toFixed(5) + "\n" +
-                    "annotations: " + state.annotations.length + "\n" +
-                    "overlays: " + state.overlays.length + "\n" +
-                    "token: " + (state.token ? "set" : "unset");
-                }
-
-                window.MKBridge = {
-                  init: function(token) {
-                    state.token = token;
-                    renderStatus();
-                    emit({ type: "mapLoaded" });
-                  },
-                  applyState: function(payload) {
-                    if (payload && payload.region) state.region = payload.region;
-                    if (payload && payload.annotations) state.annotations = payload.annotations;
-                    if (payload && payload.overlays) state.overlays = payload.overlays;
-                    renderStatus();
-                  },
-                  simulatePan: function() {
-                    state.region.centerLat = state.region.centerLat + 0.001;
-                    state.region.centerLng = state.region.centerLng + 0.001;
-                    renderStatus();
-                    emit({ type: "regionDidChange", region: state.region, settled: true });
-                  },
-                  simulateAnnotationTap: function() {
-                    const id = (state.annotations[0] && state.annotations[0].id) || "sample-annotation";
-                    emit({ type: "annotationTapped", id: id });
-                  },
-                  simulateOverlayTap: function() {
-                    const id = (state.overlays[0] && state.overlays[0].id) || "sample-overlay";
-                    emit({ type: "overlayTapped", id: id });
-                  }
-                };
-
-                renderStatus();
-              })();
-            </script>
-          </body>
-        </html>
-    """.trimIndent()
 }
