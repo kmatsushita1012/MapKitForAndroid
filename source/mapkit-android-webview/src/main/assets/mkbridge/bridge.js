@@ -2,10 +2,7 @@
   const state = {
     token: null,
     mapReady: false,
-    useMock: true,
     map: null,
-    annotationsById: {},
-    overlaysById: {},
     region: {
       centerLat: 35.681236,
       centerLng: 139.767125,
@@ -14,6 +11,10 @@
     },
     annotations: [],
     overlays: [],
+    annotationsById: {},
+    overlaysById: {},
+    annotationHashesById: {},
+    overlayHashesById: {},
   };
 
   function emit(payload) {
@@ -22,22 +23,27 @@
     }
   }
 
-  function renderStatus() {
-    const status = document.getElementById("status");
-    status.textContent =
-      "mode: " + (state.useMock ? "mock" : "mapkit") + "\n" +
-      "center: " + state.region.centerLat.toFixed(6) + ", " + state.region.centerLng.toFixed(6) + "\n" +
-      "span: " + state.region.latDelta.toFixed(5) + ", " + state.region.lngDelta.toFixed(5) + "\n" +
-      "annotations: " + state.annotations.length + "\n" +
-      "overlays: " + state.overlays.length + "\n" +
-      "token: " + (state.token ? "set" : "unset");
-  }
-
   function emitBridgeError(message) {
     emit({
       type: "bridgeError",
       message: String(message || "unknown bridge error"),
     });
+  }
+
+  function renderStatus() {
+    const status = document.getElementById("status");
+    if (!status) return;
+    status.textContent =
+      "mode: " + (state.mapReady ? "mapkit" : "not-ready") + "\n" +
+      "center: " + state.region.centerLat.toFixed(6) + ", " + state.region.centerLng.toFixed(6) + "\n" +
+      "span: " + state.region.latDelta.toFixed(5) + ", " + state.region.lngDelta.toFixed(5) + "\n" +
+      "annotations: " + Object.keys(state.annotationsById).length + "\n" +
+      "overlays: " + Object.keys(state.overlaysById).length + "\n" +
+      "token: " + (state.token ? "set" : "unset");
+  }
+
+  function stableHash(value) {
+    return JSON.stringify(value);
   }
 
   function loadMapKitScriptIfNeeded() {
@@ -63,7 +69,14 @@
   }
 
   function attachMapEvents() {
-    if (!state.map || !window.mapkit || !window.mapkit.addEventListener) return;
+    if (!state.map) return;
+    state.map.addEventListener("region-change-start", function () {
+      try {
+        emit({ type: "regionDidChange", region: state.region, settled: false });
+      } catch (e) {
+        emitBridgeError(e && e.message ? e.message : e);
+      }
+    });
     state.map.addEventListener("region-change-end", function () {
       try {
         const r = state.map.region;
@@ -82,24 +95,6 @@
     });
   }
 
-  function clearMapObjects() {
-    if (!state.map || !window.mapkit) return;
-    Object.keys(state.annotationsById).forEach((id) => {
-      const a = state.annotationsById[id];
-      try {
-        state.map.removeAnnotation(a);
-      } catch (_) {}
-    });
-    Object.keys(state.overlaysById).forEach((id) => {
-      const o = state.overlaysById[id];
-      try {
-        state.map.removeOverlay(o);
-      } catch (_) {}
-    });
-    state.annotationsById = {};
-    state.overlaysById = {};
-  }
-
   function applyMapKitRegion(region) {
     if (!state.map || !window.mapkit || !region) return;
     const center = new window.mapkit.Coordinate(region.centerLat, region.centerLng);
@@ -107,60 +102,130 @@
     state.map.region = new window.mapkit.CoordinateRegion(center, span);
   }
 
-  function applyMapKitAnnotations(annotations) {
-    if (!state.map || !window.mapkit) return;
-    annotations.forEach((item) => {
-      if (!item || !item.id) return;
-      const coord = new window.mapkit.Coordinate(item.lat, item.lng);
-      const marker = new window.mapkit.MarkerAnnotation(coord, {
-        title: item.title || item.id,
-      });
-      marker.data = { id: item.id };
-      marker.addEventListener("select", function () {
-        emit({ type: "annotationTapped", id: item.id });
-      });
-      state.annotationsById[item.id] = marker;
+  function buildAnnotation(item) {
+    const coord = new window.mapkit.Coordinate(item.lat, item.lng);
+    const marker = new window.mapkit.MarkerAnnotation(coord, {
+      title: item.title || item.id,
+      subtitle: item.subtitle || undefined,
+    });
+    marker.data = { id: item.id };
+    marker.addEventListener("select", function () {
+      emit({ type: "annotationTapped", id: item.id });
+    });
+    return marker;
+  }
+
+  function reconcileAnnotations(nextItems) {
+    const nextMap = {};
+    nextItems.forEach((item) => {
+      if (item && item.id) nextMap[item.id] = item;
+    });
+
+    Object.keys(state.annotationsById).forEach((id) => {
+      if (!nextMap[id]) {
+        try {
+          state.map.removeAnnotation(state.annotationsById[id]);
+        } catch (_) {}
+        delete state.annotationsById[id];
+        delete state.annotationHashesById[id];
+      }
+    });
+
+    Object.keys(nextMap).forEach((id) => {
+      const item = nextMap[id];
+      const nextHash = stableHash(item);
+      const prevHash = state.annotationHashesById[id];
+      if (prevHash === nextHash && state.annotationsById[id]) return;
+
+      if (state.annotationsById[id]) {
+        try {
+          state.map.removeAnnotation(state.annotationsById[id]);
+        } catch (_) {}
+      }
+      const marker = buildAnnotation(item);
       state.map.addAnnotation(marker);
+      state.annotationsById[id] = marker;
+      state.annotationHashesById[id] = nextHash;
     });
   }
 
-  function applyMapKitOverlays(overlays) {
-    if (!state.map || !window.mapkit) return;
-    overlays.forEach((item) => {
-      if (!item || !item.id || item.type !== "MKPolylineOverlay") return;
-      const points = (item.points || []).map((p) => new window.mapkit.Coordinate(p.lat, p.lng));
-      if (!points.length) return;
-      const polyline = new window.mapkit.PolylineOverlay(points, {
-        style: new window.mapkit.Style({
-          lineWidth: 4,
-          strokeColor: "#0EA5E9",
-        }),
-      });
-      polyline.data = { id: item.id };
-      state.overlaysById[item.id] = polyline;
-      state.map.addOverlay(polyline);
+  function buildPolyline(item) {
+    const points = (item.points || []).map((p) => new window.mapkit.Coordinate(p.lat, p.lng));
+    if (!points.length) return null;
+    return new window.mapkit.PolylineOverlay(points, {
+      style: new window.mapkit.Style({
+        lineWidth: item.strokeWidth || 4,
+        strokeColor: item.strokeColor || "#0EA5E9",
+      }),
+    });
+  }
+
+  function reconcileOverlays(nextItems) {
+    const nextMap = {};
+    nextItems.forEach((item) => {
+      if (item && item.id) nextMap[item.id] = item;
+    });
+
+    Object.keys(state.overlaysById).forEach((id) => {
+      if (!nextMap[id]) {
+        try {
+          state.map.removeOverlay(state.overlaysById[id]);
+        } catch (_) {}
+        delete state.overlaysById[id];
+        delete state.overlayHashesById[id];
+      }
+    });
+
+    Object.keys(nextMap).forEach((id) => {
+      const item = nextMap[id];
+      const nextHash = stableHash(item);
+      const prevHash = state.overlayHashesById[id];
+      if (prevHash === nextHash && state.overlaysById[id]) return;
+
+      if (state.overlaysById[id]) {
+        try {
+          state.map.removeOverlay(state.overlaysById[id]);
+        } catch (_) {}
+      }
+
+      let overlay = null;
+      if (item.type === "MKPolylineOverlay") {
+        overlay = buildPolyline(item);
+      }
+      if (!overlay) return;
+
+      overlay.data = { id: item.id };
+      state.map.addOverlay(overlay);
+      state.overlaysById[id] = overlay;
+      state.overlayHashesById[id] = nextHash;
     });
   }
 
   function initializeMapKit() {
-    return loadMapKitScriptIfNeeded()
-      .then(() => {
-        if (!window.mapkit) throw new Error("mapkit is unavailable");
-        window.mapkit.init({
-          authorizationCallback: function (done) {
-            done(state.token);
-          },
-        });
-        state.map = new window.mapkit.Map("mapCanvas", {
-          isRotationEnabled: true,
-          isZoomEnabled: true,
-          isScrollEnabled: true,
-          showsCompass: window.mapkit.FeatureVisibility && window.mapkit.FeatureVisibility.Adaptive,
-        });
-        attachMapEvents();
-        state.mapReady = true;
-        state.useMock = false;
+    return loadMapKitScriptIfNeeded().then(() => {
+      if (!window.mapkit) throw new Error("mapkit is unavailable");
+      window.mapkit.init({
+        authorizationCallback: function (done) {
+          done(state.token);
+        },
       });
+      state.map = new window.mapkit.Map("mapCanvas", {
+        isRotationEnabled: true,
+        isZoomEnabled: true,
+        isScrollEnabled: true,
+        showsCompass: window.mapkit.FeatureVisibility && window.mapkit.FeatureVisibility.Adaptive,
+      });
+      attachMapEvents();
+      state.mapReady = true;
+    });
+  }
+
+  function applyStateToMap() {
+    if (!state.mapReady || !state.map) return;
+    applyMapKitRegion(state.region);
+    reconcileAnnotations(state.annotations || []);
+    reconcileOverlays(state.overlays || []);
+    renderStatus();
   }
 
   window.MKBridge = {
@@ -168,45 +233,33 @@
       state.token = token;
       initializeMapKit()
         .then(function () {
-          renderStatus();
+          applyStateToMap();
           emit({ type: "mapLoaded" });
         })
         .catch(function (e) {
           state.mapReady = false;
-          state.useMock = true;
           renderStatus();
           emitBridgeError(e && e.message ? e.message : e);
-          emit({ type: "mapLoaded" });
         });
     },
     applyState: function (payload) {
       if (payload && payload.region) state.region = payload.region;
       if (payload && payload.annotations) state.annotations = payload.annotations;
       if (payload && payload.overlays) state.overlays = payload.overlays;
-      if (!state.useMock && state.mapReady) {
-        try {
-          clearMapObjects();
-          applyMapKitRegion(state.region);
-          applyMapKitAnnotations(state.annotations);
-          applyMapKitOverlays(state.overlays);
-        } catch (e) {
-          emitBridgeError(e && e.message ? e.message : e);
-        }
+      try {
+        applyStateToMap();
+      } catch (e) {
+        emitBridgeError(e && e.message ? e.message : e);
       }
-      renderStatus();
     },
     simulatePan: function () {
-      state.region.centerLat = state.region.centerLat + 0.001;
-      state.region.centerLng = state.region.centerLng + 0.001;
-      renderStatus();
-      if (!state.useMock && state.mapReady) {
-        try {
-          applyMapKitRegion(state.region);
-        } catch (e) {
-          emitBridgeError(e && e.message ? e.message : e);
-        }
+      if (state.mapReady) {
+        state.region.centerLat = state.region.centerLat + 0.001;
+        state.region.centerLng = state.region.centerLng + 0.001;
+        applyMapKitRegion(state.region);
+        emit({ type: "regionDidChange", region: state.region, settled: true });
+        renderStatus();
       }
-      emit({ type: "regionDidChange", region: state.region, settled: true });
     },
     simulateAnnotationTap: function () {
       const id = (state.annotations[0] && state.annotations[0].id) || "sample-annotation";

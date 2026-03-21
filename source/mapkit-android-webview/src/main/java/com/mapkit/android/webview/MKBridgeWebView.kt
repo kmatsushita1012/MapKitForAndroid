@@ -114,6 +114,7 @@ class MKBridgeWebView @JvmOverloads constructor(
                         .put("lat", annotation.coordinate.latitude)
                         .put("lng", annotation.coordinate.longitude)
                         .put("title", annotation.title)
+                        .put("subtitle", annotation.subtitle)
                 )
             }
         }
@@ -133,6 +134,9 @@ class MKBridgeWebView @JvmOverloads constructor(
                                 }
                             }
                         )
+                        overlayJson
+                            .put("strokeColor", overlay.style.strokeColorHex)
+                            .put("strokeWidth", overlay.style.strokeWidth)
                     }
                     else -> Unit
                 }
