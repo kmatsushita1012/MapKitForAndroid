@@ -120,7 +120,23 @@ class MKBridgeWebView @JvmOverloads constructor(
 
         val overlays = JSONArray().apply {
             state.overlays.forEach { overlay ->
-                put(JSONObject().put("id", overlay.id).put("type", overlay::class.simpleName))
+                val overlayJson = JSONObject()
+                    .put("id", overlay.id)
+                    .put("type", overlay::class.simpleName)
+                when (overlay) {
+                    is com.mapkit.android.model.MKPolylineOverlay -> {
+                        overlayJson.put(
+                            "points",
+                            JSONArray().apply {
+                                overlay.points.forEach { point ->
+                                    put(JSONObject().put("lat", point.latitude).put("lng", point.longitude))
+                                }
+                            }
+                        )
+                    }
+                    else -> Unit
+                }
+                put(overlayJson)
             }
         }
 
@@ -149,6 +165,9 @@ class MKBridgeWebView @JvmOverloads constructor(
 
             "annotationTapped" -> MKMapEvent.AnnotationTapped(json.getString("id"))
             "overlayTapped" -> MKMapEvent.OverlayTapped(json.getString("id"))
+            "bridgeError" -> MKMapEvent.MapError(
+                MKMapErrorCause.BridgeFailure(json.optString("message", "bridge error"))
+            )
             "userLocationUpdated" -> MKMapEvent.UserLocationUpdated(
                 coordinate = MKCoordinate(
                     latitude = json.getDouble("lat"),
