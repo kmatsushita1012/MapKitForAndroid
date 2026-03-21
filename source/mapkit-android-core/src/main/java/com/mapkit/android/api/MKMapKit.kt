@@ -16,6 +16,5 @@ object MKMapKit {
 
     fun isInitialized(): Boolean = !tokenRef.get().isNullOrBlank()
 
-    internal fun requireToken(): String = tokenRef.get()
-        ?: throw IllegalStateException("MKMapKit is not initialized. Call MKMapKit.init(token).")
+    fun currentTokenOrNull(): String? = tokenRef.get()
 }

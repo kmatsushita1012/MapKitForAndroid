@@ -11,8 +11,12 @@ import com.mapkit.android.api.MKMapKit
 import com.mapkit.android.api.MKMapView
 import com.mapkit.android.model.MKCoordinate
 import com.mapkit.android.model.MKCoordinateRegion
+import com.mapkit.android.model.MKMapErrorCause
 import com.mapkit.android.model.MKMapEvent
 import com.mapkit.android.model.MKMapState
+import com.mapkit.android.model.MKOverlayStyle
+import com.mapkit.android.model.MKPolylineOverlay
+import com.mapkit.android.model.MKAnnotation
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,6 +34,24 @@ class MainActivity : ComponentActivity() {
                             center = MKCoordinate(35.681236, 139.767125),
                             latitudeDelta = 0.05,
                             longitudeDelta = 0.05
+                        ),
+                        annotations = listOf(
+                            MKAnnotation(
+                                id = "tokyo-station",
+                                coordinate = MKCoordinate(35.681236, 139.767125),
+                                title = "Tokyo Station"
+                            )
+                        ),
+                        overlays = listOf(
+                            MKPolylineOverlay(
+                                id = "sample-route",
+                                points = listOf(
+                                    MKCoordinate(35.680000, 139.765000),
+                                    MKCoordinate(35.681236, 139.767125),
+                                    MKCoordinate(35.683000, 139.770000)
+                                ),
+                                style = MKOverlayStyle(strokeColorHex = "#0EA5E9", strokeWidth = 4.0)
+                            )
                         )
                     )
                 )
@@ -38,8 +60,26 @@ class MainActivity : ComponentActivity() {
             MKMapView(
                 state = state,
                 onEvent = { event ->
-                    if (event is MKMapEvent.RegionDidChange && event.settled) {
-                        state = state.copy(region = event.region)
+                    when (event) {
+                        is MKMapEvent.RegionDidChange -> if (event.settled) {
+                            state = state.copy(region = event.region)
+                        }
+
+                        is MKMapEvent.AnnotationTapped -> {
+                            android.util.Log.d("MKDemo", "Annotation tapped: ${event.id}")
+                        }
+
+                        is MKMapEvent.OverlayTapped -> {
+                            android.util.Log.d("MKDemo", "Overlay tapped: ${event.id}")
+                        }
+
+                        is MKMapEvent.MapError -> {
+                            if (event.cause is MKMapErrorCause.BridgeFailure) {
+                                android.util.Log.e("MKDemo", "Bridge error: ${(event.cause as MKMapErrorCause.BridgeFailure).message}")
+                            }
+                        }
+
+                        else -> Unit
                     }
                 }
             )
