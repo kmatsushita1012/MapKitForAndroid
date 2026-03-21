@@ -20,4 +20,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MapKit for Android"
-include(":app")
+include(":source:mapkit-android-core")
+include(":source:mapkit-android-webview")
+include(":source:mapkit-android-compose")
+include(":example:demo-app")
