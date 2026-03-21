@@ -66,7 +66,7 @@
       }
       const script = document.createElement("script");
       script.id = "apple-mapkit-script";
-      script.src = "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js";
+      script.src = "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js";
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("failed to load mapkit script"));
