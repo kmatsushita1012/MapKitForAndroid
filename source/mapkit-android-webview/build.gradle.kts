@@ -32,6 +32,7 @@ android {
 dependencies {
     api(project(":source:mapkit-android-core"))
     implementation(libs.androidx.webkit)
+    testImplementation(libs.junit)
 }
 
 publishing {
