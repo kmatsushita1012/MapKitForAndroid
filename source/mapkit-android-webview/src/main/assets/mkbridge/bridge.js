@@ -373,16 +373,12 @@
     const emphasisPoi = emphasis === "walking" || emphasis === "transit";
     const effectiveTraffic = !!state.showsTraffic || emphasisTraffic;
     const effectivePoi = !!state.showsPointsOfInterest || emphasisPoi;
-    const requestedMapStyle = state.mapStyle;
 
     try {
-      let resolvedStyle = requestedMapStyle;
-      if (effectiveTraffic && requestedMapStyle === "mutedStandard") {
+      let resolvedStyle = state.mapStyle;
+      if (effectiveTraffic && state.mapStyle === "mutedStandard") {
         // Muted standard may not render traffic overlays; prefer standard when traffic is on.
         resolvedStyle = "standard";
-      }
-      if (emphasis === "transit" && requestedMapStyle === "standard") {
-        resolvedStyle = "hybrid";
       }
       const nextMapType = mapTypeFor(resolvedStyle);
       if (nextMapType) {
@@ -399,6 +395,9 @@
 
     try {
       state.map.showsTraffic = !!effectiveTraffic;
+    } catch (_) {}
+    try {
+      state.map.showsTraffic = featureVisibilityFor(!!effectiveTraffic);
     } catch (_) {}
 
     try {
@@ -441,7 +440,9 @@
       " emphasis=" + emphasis +
       " traffic=" + effectiveTraffic +
       " poi=" + effectivePoi +
-      " compass=" + state.showsCompass
+      " compass=" + state.showsCompass +
+      " mapType=" + String(state.map.mapType) +
+      " map.showsTraffic=" + String(state.map.showsTraffic)
     );
   }
 
