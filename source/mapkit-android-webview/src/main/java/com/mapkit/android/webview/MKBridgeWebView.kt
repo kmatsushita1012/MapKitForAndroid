@@ -59,6 +59,12 @@ class MKBridgeWebView @JvmOverloads constructor(
         settings.domStorageEnabled = true
         settings.allowFileAccess = true
         settings.allowContentAccess = false
+        settings.setSupportZoom(false)
+        settings.builtInZoomControls = false
+        settings.displayZoomControls = false
+        settings.useWideViewPort = true
+        isLongClickable = false
+        setOnLongClickListener { true }
         webChromeClient = WebChromeClient()
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
