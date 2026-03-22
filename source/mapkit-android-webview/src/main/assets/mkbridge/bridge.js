@@ -284,6 +284,9 @@
     };
 
     target.addEventListener("pointerdown", function (event) {
+      if (event.pointerType && event.pointerType !== "touch") {
+        return;
+      }
       activePointers.add(event.pointerId);
       if (activePointers.size > 1 || !event.isPrimary) {
         clearTimer();
@@ -300,6 +303,9 @@
     });
 
     target.addEventListener("pointermove", function (event) {
+      if (event.pointerType && event.pointerType !== "touch") {
+        return;
+      }
       if (activePointers.size > 1 || !event.isPrimary) {
         clearTimer();
         return;
@@ -314,6 +320,9 @@
     });
 
     const onPointerEnd = function (event) {
+      if (event.pointerType && event.pointerType !== "touch") {
+        return;
+      }
       activePointers.delete(event.pointerId);
       clearTimer();
     };
