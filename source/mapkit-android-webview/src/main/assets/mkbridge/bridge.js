@@ -204,7 +204,12 @@
     try {
       if (!window.mapkit || typeof window.mapkit.CameraZoomRange === "undefined") return;
       if (!range || (range.minDistanceMeter == null && range.maxDistanceMeter == null)) {
-        state.map.cameraZoomRange = null;
+        try {
+          // Clear range. Some runtimes reject null, so fallback to a wide-open range.
+          state.map.cameraZoomRange = null;
+        } catch (_) {
+          state.map.cameraZoomRange = new window.mapkit.CameraZoomRange(0, 100000000);
+        }
         return;
       }
       const minD = (range.minDistanceMeter == null) ? undefined : range.minDistanceMeter;
@@ -553,6 +558,7 @@
       " compass=" + state.showsCompass +
       " zoomEnabled=" + state.isZoomEnabled +
       " zoomControl=" + state.showsZoomControl +
+      " zoomRange=" + JSON.stringify(state.cameraZoomRange) +
       " mapType=" + String(state.map.mapType)
     );
   }
