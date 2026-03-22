@@ -412,16 +412,18 @@
     state.map.addEventListener("select", function (event) {
       try {
         if (event && event.annotation && event.annotation.data && event.annotation.data.id) {
+          debugLog("emit annotationTapped id=" + String(event.annotation.data.id));
           emit({ type: "annotationTapped", id: String(event.annotation.data.id) });
           return;
         }
         if (event && event.overlay && event.overlay.data && event.overlay.data.id) {
+          debugLog("emit overlayTapped id=" + String(event.overlay.data.id));
           emit({ type: "overlayTapped", id: String(event.overlay.data.id) });
         }
       } catch (_) {}
     });
 
-    setupLongPressDetection();
+    // Gesture input is emitted from Android WebView touch detector via emitGestureAt().
   }
 
   function applyMapKitRegion(region) {
@@ -823,6 +825,22 @@
       applyUserLocationPoint();
       emit({ type: "userLocationUpdated", lat: payload.lat, lng: payload.lng });
       renderStatus();
+    },
+
+    emitGestureAt: function (pageX, pageY, type) {
+      if (!state.mapReady) return;
+      const c = pointToCoordinate(Number(pageX), Number(pageY));
+      if (!c) return;
+      if (type === "longPress") {
+        debugLog("emit longPress lat=" + c.latitude + " lng=" + c.longitude);
+        emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
+        return;
+      }
+      const now = Date.now();
+      if (now - state.lastMapTapAt < 180) return;
+      state.lastMapTapAt = now;
+      debugLog("emit mapTapped lat=" + c.latitude + " lng=" + c.longitude);
+      emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
     },
 
     simulatePan: function () {
