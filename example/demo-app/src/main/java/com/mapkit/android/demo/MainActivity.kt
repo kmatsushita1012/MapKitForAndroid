@@ -148,6 +148,7 @@ class MainActivity : ComponentActivity() {
 
                             is MKMapEvent.MapError -> {
                                 if (event.cause is MKMapErrorCause.BridgeFailure) {
+                                    // DEBUG_BREAKPOINT_4: JS 側 debug / bridgeError メッセージ受信点
                                     android.util.Log.e("MKDemo", "Bridge error: ${(event.cause as MKMapErrorCause.BridgeFailure).message}")
                                 }
                             }

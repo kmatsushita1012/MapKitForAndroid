@@ -28,6 +28,14 @@
     }
   }
 
+  function debugLog(message) {
+    const text = "[MKBridgeJS] " + message;
+    try {
+      console.log(text);
+      emit({ type: "debug", message: text });
+    } catch (_) {}
+  }
+
   function emitBridgeError(message) {
     emit({
       type: "bridgeError",
@@ -208,10 +216,15 @@
   }
 
   function initializeMapKit() {
+    // DEBUG_BREAKPOINT_JS_1: init(token) 後にここへ入るか確認
+    debugLog("initializeMapKit called");
     return loadMapKitScriptIfNeeded().then(() => {
       if (!window.mapkit) throw new Error("mapkit is unavailable");
+      debugLog("mapkit script loaded");
       window.mapkit.init({
         authorizationCallback: function (done) {
+          // DEBUG_BREAKPOINT_JS_2: authorizationCallback が呼ばれて token を返せているか
+          debugLog("authorizationCallback called");
           done(state.token);
         },
       });
@@ -223,6 +236,7 @@
       });
       attachMapEvents();
       state.mapReady = true;
+      debugLog("map instance created");
     });
   }
 
@@ -269,6 +283,8 @@
 
   window.MKBridge = {
     init: function (token) {
+      // DEBUG_BREAKPOINT_JS_3: Kotlin から init(token) が届いているか
+      debugLog("init called from kotlin");
       state.token = token;
       initializeMapKit()
         .then(function () {
@@ -282,6 +298,7 @@
         });
     },
     applyState: function (payload) {
+      debugLog("applyState called");
       if (payload && payload.region) state.region = payload.region;
       if (payload && payload.annotations) state.annotations = payload.annotations;
       if (payload && payload.overlays) state.overlays = payload.overlays;

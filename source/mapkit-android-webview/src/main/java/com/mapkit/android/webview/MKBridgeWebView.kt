@@ -3,6 +3,7 @@ package com.mapkit.android.webview
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -72,6 +73,8 @@ class MKBridgeWebView @JvmOverloads constructor(
     }
 
     fun ensureInitialized(token: String) {
+        // DEBUG_BREAKPOINT_1: ensureInitialized() が呼ばれて token が来ているか確認
+        Log.d("MKBridgeWebView", "ensureInitialized called. tokenLength=${token.length}")
         pendingToken = token
         sendInitIfPossible()
     }
@@ -111,6 +114,8 @@ class MKBridgeWebView @JvmOverloads constructor(
     private fun sendInitIfPossible() {
         if (!isPageReady || isJsInitSent) return
         val token = pendingToken ?: return
+        // DEBUG_BREAKPOINT_2: JS init 実行直前。isPageReady=true, token!=null を確認
+        Log.d("MKBridgeWebView", "sendInitIfPossible -> init() to JS")
         val escaped = JSONObject.quote(token)
         evaluateJavascriptSafe("window.MKBridge && window.MKBridge.init($escaped);")
         isJsInitSent = true
@@ -189,6 +194,8 @@ class MKBridgeWebView @JvmOverloads constructor(
     }
 
     private fun parseEvent(json: JSONObject): MKMapEvent {
+        // DEBUG_BREAKPOINT_3: JS -> Android の受信イベントを確認
+        Log.d("MKBridgeWebView", "parseEvent type=${json.optString("type")}")
         return when (json.optString("type")) {
             "mapLoaded" -> MKMapEvent.MapLoaded
             "regionDidChange" -> {
@@ -207,6 +214,9 @@ class MKBridgeWebView @JvmOverloads constructor(
             "overlayTapped" -> MKMapEvent.OverlayTapped(json.getString("id"))
             "bridgeError" -> MKMapEvent.MapError(
                 MKMapErrorCause.BridgeFailure(json.optString("message", "bridge error"))
+            )
+            "debug" -> MKMapEvent.MapError(
+                MKMapErrorCause.BridgeFailure(json.optString("message", "debug"))
             )
             "userLocationUpdated" -> MKMapEvent.UserLocationUpdated(
                 coordinate = MKCoordinate(
