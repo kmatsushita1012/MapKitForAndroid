@@ -298,7 +298,11 @@
     };
 
     const isInsideMapCanvas = function (event) {
-      return !!(event && event.target && target.contains(event.target));
+      if (!event) return false;
+      const rect = target.getBoundingClientRect();
+      const x = (typeof event.clientX === "number") ? event.clientX : 0;
+      const y = (typeof event.clientY === "number") ? event.clientY : 0;
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     };
 
     const onPointerDown = function (event) {
@@ -317,7 +321,7 @@
         const c = pointToCoordinate(state.longPressStart.x, state.longPressStart.y);
         if (!c) return;
         longPressFired = true;
-        debugLog("emit longPress");
+        debugLog("emit longPress lat=" + c.latitude + " lng=" + c.longitude);
         emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
       }, 550);
     };
@@ -352,7 +356,7 @@
           const now = Date.now();
           if (now - state.lastMapTapAt >= 180) {
             state.lastMapTapAt = now;
-            debugLog("emit mapTapped");
+            debugLog("emit mapTapped lat=" + c.latitude + " lng=" + c.longitude);
             emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
           }
         }
@@ -367,7 +371,7 @@
       const now = Date.now();
       if (now - state.lastMapTapAt < 180) return;
       state.lastMapTapAt = now;
-      debugLog("emit mapTapped(click)");
+      debugLog("emit mapTapped(click) lat=" + c.latitude + " lng=" + c.longitude);
       emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
     };
 
@@ -403,6 +407,18 @@
       } catch (e) {
         emitBridgeError(e && e.message ? e.message : e);
       }
+    });
+
+    state.map.addEventListener("select", function (event) {
+      try {
+        if (event && event.annotation && event.annotation.data && event.annotation.data.id) {
+          emit({ type: "annotationTapped", id: String(event.annotation.data.id) });
+          return;
+        }
+        if (event && event.overlay && event.overlay.data && event.overlay.data.id) {
+          emit({ type: "overlayTapped", id: String(event.overlay.data.id) });
+        }
+      } catch (_) {}
     });
 
     setupLongPressDetection();
@@ -469,9 +485,6 @@
     if (item.isSelected && typeof annotation.selected !== "undefined") {
       annotation.selected = true;
     }
-    annotation.addEventListener("select", function () {
-      emit({ type: "annotationTapped", id: item.id });
-    });
     return annotation;
   }
 
@@ -582,11 +595,6 @@
       if (!overlay) return;
 
       overlay.data = { id: item.id };
-      if (typeof overlay.addEventListener === "function") {
-        overlay.addEventListener("select", function () {
-          emit({ type: "overlayTapped", id: item.id });
-        });
-      }
       state.map.addOverlay(overlay);
       state.overlaysById[id] = overlay;
       state.overlayHashesById[id] = nextHash;
