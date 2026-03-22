@@ -528,7 +528,6 @@
       "applyMapOptions style=" + state.mapStyle +
       " poi=" + effectivePoi +
       " compass=" + state.showsCompass +
-      " zoomEnabled=" + state.isZoomEnabled +
       " zoomControl=" + state.showsZoomControl +
       " mapType=" + String(state.map.mapType)
     );
