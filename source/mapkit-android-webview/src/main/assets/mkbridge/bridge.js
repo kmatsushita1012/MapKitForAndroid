@@ -10,10 +10,8 @@
       lngDelta: 0.05,
     },
     mapStyle: "standard",
-    navigationEmphasis: "none",
     appearance: "auto",
     language: "auto",
-    showsTraffic: false,
     showsCompass: true,
     showsScale: false,
     showsPointsOfInterest: true,
@@ -368,19 +366,10 @@
 
   function applyMapOptions() {
     if (!state.mapReady || !state.map) return;
-    const emphasis = state.navigationEmphasis || "none";
-    const emphasisTraffic = emphasis === "driving" || emphasis === "transit";
-    const emphasisPoi = emphasis === "walking" || emphasis === "transit";
-    const effectiveTraffic = !!state.showsTraffic || emphasisTraffic;
-    const effectivePoi = !!state.showsPointsOfInterest || emphasisPoi;
+    const effectivePoi = !!state.showsPointsOfInterest;
 
     try {
-      let resolvedStyle = state.mapStyle;
-      if (effectiveTraffic && state.mapStyle === "mutedStandard") {
-        // Muted standard may not render traffic overlays; prefer standard when traffic is on.
-        resolvedStyle = "standard";
-      }
-      const nextMapType = mapTypeFor(resolvedStyle);
+      const nextMapType = mapTypeFor(state.mapStyle);
       if (nextMapType) {
         state.map.mapType = nextMapType;
       }
@@ -391,13 +380,6 @@
       if (nextScheme) {
         state.map.colorScheme = nextScheme;
       }
-    } catch (_) {}
-
-    try {
-      state.map.showsTraffic = !!effectiveTraffic;
-    } catch (_) {}
-    try {
-      state.map.showsTraffic = featureVisibilityFor(!!effectiveTraffic);
     } catch (_) {}
 
     try {
@@ -437,12 +419,9 @@
 
     debugLog(
       "applyMapOptions style=" + state.mapStyle +
-      " emphasis=" + emphasis +
-      " traffic=" + effectiveTraffic +
       " poi=" + effectivePoi +
       " compass=" + state.showsCompass +
-      " mapType=" + String(state.map.mapType) +
-      " map.showsTraffic=" + String(state.map.showsTraffic)
+      " mapType=" + String(state.map.mapType)
     );
   }
 
@@ -553,10 +532,8 @@
       if (payload && payload.overlays) state.overlays = payload.overlays;
 
       if (payload && payload.mapStyle) state.mapStyle = payload.mapStyle;
-      if (payload && payload.navigationEmphasis) state.navigationEmphasis = payload.navigationEmphasis;
       if (payload && payload.appearance) state.appearance = payload.appearance;
       if (payload && payload.language) state.language = payload.language;
-      if (payload && typeof payload.showsTraffic !== "undefined") state.showsTraffic = !!payload.showsTraffic;
       if (payload && typeof payload.showsCompass !== "undefined") state.showsCompass = !!payload.showsCompass;
       if (payload && typeof payload.showsScale !== "undefined") state.showsScale = !!payload.showsScale;
       if (payload && typeof payload.showsPointsOfInterest !== "undefined") {

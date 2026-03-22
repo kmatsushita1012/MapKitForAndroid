@@ -133,13 +133,6 @@ enum class MKMapStyle {
     hybrid
 }
 
-enum class MKNavigationEmphasis {
-    none,
-    driving,
-    walking,
-    transit
-}
-
 enum class MKAppearanceOption {
     auto,
     light,
@@ -160,8 +153,6 @@ data class MKUserLocationOptions(
 
 data class MKMapOptions(
     val mapStyle: MKMapStyle = MKMapStyle.standard,
-    val navigationEmphasis: MKNavigationEmphasis = MKNavigationEmphasis.none,
-    val showsTraffic: Boolean = false,
     val showsCompass: Boolean = true,
     val showsScale: Boolean = false,
     val showsPointsOfInterest: Boolean = true,

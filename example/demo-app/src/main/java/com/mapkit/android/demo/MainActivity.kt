@@ -48,7 +48,6 @@ import com.mapkit.android.model.MKMapLanguage
 import com.mapkit.android.model.MKMapOptions
 import com.mapkit.android.model.MKMapState
 import com.mapkit.android.model.MKMapStyle
-import com.mapkit.android.model.MKNavigationEmphasis
 import com.mapkit.android.model.MKOverlay
 import com.mapkit.android.model.MKOverlayStyle
 import com.mapkit.android.model.MKPolygonOverlay
@@ -352,18 +351,7 @@ private fun DemoScreen() {
                         values = MKAppearanceOption.entries,
                         onSelected = { options = options.copy(appearance = it) }
                     )
-                    EnumSelector(
-                        label = "Navigation Emphasis",
-                        value = options.navigationEmphasis,
-                        values = MKNavigationEmphasis.entries,
-                        onSelected = { options = options.copy(navigationEmphasis = it) }
-                    )
 
-                    ToggleRow(
-                        label = "Traffic",
-                        checked = options.showsTraffic,
-                        onCheckedChange = { options = options.copy(showsTraffic = it) }
-                    )
                     ToggleRow(
                         label = "Compass",
                         checked = options.showsCompass,

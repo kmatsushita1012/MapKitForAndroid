@@ -211,8 +211,6 @@ class MKBridgeWebView @JvmOverloads constructor(
             .put("annotations", annotations)
             .put("overlays", overlays)
             .put("mapStyle", state.options.mapStyle.name)
-            .put("navigationEmphasis", state.options.navigationEmphasis.name)
-            .put("showsTraffic", state.options.showsTraffic)
             .put("showsCompass", state.options.showsCompass)
             .put("showsScale", state.options.showsScale)
             .put("showsPointsOfInterest", state.options.showsPointsOfInterest)
