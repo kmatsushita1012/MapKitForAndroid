@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -130,6 +132,8 @@ private fun DemoScreen() {
     var annotationSubtitle by remember { mutableStateOf("") }
     var annotationTintHex by remember { mutableStateOf("#0ea5e9") }
     var annotationGlyph by remember { mutableStateOf("A") }
+    var baseConfigExpanded by remember { mutableStateOf(true) }
+    var annotationConfigExpanded by remember { mutableStateOf(true) }
 
     val selectedTab = if (selectedTabIndex == 0) DemoTab.Map else DemoTab.Settings
 
@@ -400,153 +404,183 @@ private fun DemoScreen() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    EnumSelector(
-                        label = "Placement Trigger",
-                        value = placementTrigger,
-                        values = PlacementTrigger.entries,
-                        onSelected = { placementTrigger = it }
+                    ConfigSectionHeader(
+                        title = "Annotation Config",
+                        expanded = annotationConfigExpanded,
+                        onExpandedChange = { annotationConfigExpanded = it }
                     )
-                    EnumSelector(
-                        label = "Annotation Style",
-                        value = annotationVisualStyle,
-                        values = AnnotationVisualStyle.entries,
-                        onSelected = { annotationVisualStyle = it }
-                    )
-                    OutlinedTextField(
-                        value = annotationTitle,
-                        onValueChange = { annotationTitle = it },
-                        label = { Text("Annotation Title") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = annotationSubtitle,
-                        onValueChange = { annotationSubtitle = it },
-                        label = { Text("Annotation Subtitle") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (annotationVisualStyle == AnnotationVisualStyle.Default) {
+                    if (annotationConfigExpanded) {
+                        EnumSelector(
+                            label = "Placement Trigger",
+                            value = placementTrigger,
+                            values = PlacementTrigger.entries,
+                            onSelected = { placementTrigger = it }
+                        )
+                        EnumSelector(
+                            label = "Annotation Style",
+                            value = annotationVisualStyle,
+                            values = AnnotationVisualStyle.entries,
+                            onSelected = { annotationVisualStyle = it }
+                        )
                         OutlinedTextField(
-                            value = annotationTintHex,
-                            onValueChange = { annotationTintHex = it },
-                            label = { Text("Marker Tint (hex)") },
+                            value = annotationTitle,
+                            onValueChange = { annotationTitle = it },
+                            label = { Text("Annotation Title") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
-                            value = annotationGlyph,
-                            onValueChange = { annotationGlyph = it.take(2) },
-                            label = { Text("Marker Glyph") },
+                            value = annotationSubtitle,
+                            onValueChange = { annotationSubtitle = it },
+                            label = { Text("Annotation Subtitle") },
                             modifier = Modifier.fillMaxWidth()
                         )
-                    } else {
-                        Text(
-                            text = "Custom image: file:///android_asset/demo/custom-annotation.svg",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    EnumSelector(
-                        label = "Map Style",
-                        value = options.mapStyle,
-                        values = MKMapStyle.entries,
-                        onSelected = { options = options.copy(mapStyle = it) }
-                    )
-                    EnumSelector(
-                        label = "Language",
-                        value = options.language,
-                        values = MKMapLanguage.entries,
-                        onSelected = { options = options.copy(language = it) }
-                    )
-                    EnumSelector(
-                        label = "Appearance",
-                        value = options.appearance,
-                        values = MKAppearanceOption.entries,
-                        onSelected = { options = options.copy(appearance = it) }
-                    )
-                    EnumSelector(
-                        label = "POI Filter",
-                        value = poiFilterPreset,
-                        values = PoiFilterPreset.entries,
-                        onSelected = { preset ->
-                            val filter = when (preset) {
-                                PoiFilterPreset.all -> MKPoiFilter.All
-                                PoiFilterPreset.none -> MKPoiFilter.None
-                                PoiFilterPreset.includeCafePark -> {
-                                    MKPoiFilter.Include(listOf("cafe", "park"))
-                                }
-                                PoiFilterPreset.excludeCafePark -> {
-                                    MKPoiFilter.Exclude(listOf("cafe", "park"))
-                                }
-                            }
-                            options = options.copy(poiFilter = filter)
-                        }
-                    )
-                    EnumSelector(
-                        label = "Zoom Range",
-                        value = zoomRangePreset,
-                        values = ZoomRangePreset.entries,
-                        onSelected = { preset ->
-                            options = options.copy(
-                                cameraZoomRange = when (preset) {
-                                    ZoomRangePreset.none -> null
-                                    ZoomRangePreset.city -> MKCameraZoomRange(
-                                        minDistanceMeter = 150.0,
-                                        maxDistanceMeter = 20_000.0
-                                    )
-                                    ZoomRangePreset.district -> MKCameraZoomRange(
-                                        minDistanceMeter = 50.0,
-                                        maxDistanceMeter = 3_000.0
-                                    )
-                                }
+                        if (annotationVisualStyle == AnnotationVisualStyle.Default) {
+                            OutlinedTextField(
+                                value = annotationTintHex,
+                                onValueChange = { annotationTintHex = it },
+                                label = { Text("Marker Tint (hex)") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = annotationGlyph,
+                                onValueChange = { annotationGlyph = it.take(2) },
+                                label = { Text("Marker Glyph") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text(
+                                text = "Custom image: file:///android_asset/demo/custom-annotation.svg",
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
-                    )
+                    }
 
-                    ToggleRow(
-                        label = "Compass",
-                        checked = options.showsCompass,
-                        onCheckedChange = { options = options.copy(showsCompass = it) }
+                    ConfigSectionHeader(
+                        title = "Base Config",
+                        expanded = baseConfigExpanded,
+                        onExpandedChange = { baseConfigExpanded = it }
                     )
-                    ToggleRow(
-                        label = "Points Of Interest",
-                        checked = options.showsPointsOfInterest,
-                        onCheckedChange = { options = options.copy(showsPointsOfInterest = it) }
-                    )
-                    ToggleRow(
-                        label = "Zoom Control",
-                        checked = options.showsZoomControl,
-                        onCheckedChange = { options = options.copy(showsZoomControl = it) }
-                    )
-                    ToggleRow(
-                        label = "Map Type Control",
-                        checked = options.showsMapTypeControl,
-                        onCheckedChange = { options = options.copy(showsMapTypeControl = it) }
-                    )
-                    ToggleRow(
-                        label = "Rotate Enabled",
-                        checked = options.isRotateEnabled,
-                        onCheckedChange = { options = options.copy(isRotateEnabled = it) }
-                    )
-                    ToggleRow(
-                        label = "Scroll Enabled",
-                        checked = options.isScrollEnabled,
-                        onCheckedChange = { options = options.copy(isScrollEnabled = it) }
-                    )
-                    ToggleRow(
-                        label = "Zoom Enabled",
-                        checked = options.isZoomEnabled,
-                        onCheckedChange = { options = options.copy(isZoomEnabled = it) }
-                    )
-                    ToggleRow(
-                        label = "Pitch Enabled",
-                        checked = options.isPitchEnabled,
-                        onCheckedChange = { options = options.copy(isPitchEnabled = it) }
-                    )
+                    if (baseConfigExpanded) {
+                        EnumSelector(
+                            label = "Map Style",
+                            value = options.mapStyle,
+                            values = MKMapStyle.entries,
+                            onSelected = { options = options.copy(mapStyle = it) }
+                        )
+                        EnumSelector(
+                            label = "Language",
+                            value = options.language,
+                            values = MKMapLanguage.entries,
+                            onSelected = { options = options.copy(language = it) }
+                        )
+                        EnumSelector(
+                            label = "Appearance",
+                            value = options.appearance,
+                            values = MKAppearanceOption.entries,
+                            onSelected = { options = options.copy(appearance = it) }
+                        )
+                        EnumSelector(
+                            label = "POI Filter",
+                            value = poiFilterPreset,
+                            values = PoiFilterPreset.entries,
+                            onSelected = { preset ->
+                                val filter = when (preset) {
+                                    PoiFilterPreset.all -> MKPoiFilter.All
+                                    PoiFilterPreset.none -> MKPoiFilter.None
+                                    PoiFilterPreset.includeCafePark -> {
+                                        MKPoiFilter.Include(listOf("cafe", "park"))
+                                    }
+                                    PoiFilterPreset.excludeCafePark -> {
+                                        MKPoiFilter.Exclude(listOf("cafe", "park"))
+                                    }
+                                }
+                                options = options.copy(poiFilter = filter)
+                            }
+                        )
+                        EnumSelector(
+                            label = "Zoom Range",
+                            value = zoomRangePreset,
+                            values = ZoomRangePreset.entries,
+                            onSelected = { preset ->
+                                options = options.copy(
+                                    cameraZoomRange = when (preset) {
+                                        ZoomRangePreset.none -> null
+                                        ZoomRangePreset.city -> MKCameraZoomRange(
+                                            minDistanceMeter = 150.0,
+                                            maxDistanceMeter = 20_000.0
+                                        )
+                                        ZoomRangePreset.district -> MKCameraZoomRange(
+                                            minDistanceMeter = 50.0,
+                                            maxDistanceMeter = 3_000.0
+                                        )
+                                    }
+                                )
+                            }
+                        )
+
+                        ToggleRow(
+                            label = "Compass",
+                            checked = options.showsCompass,
+                            onCheckedChange = { options = options.copy(showsCompass = it) }
+                        )
+                        ToggleRow(
+                            label = "Points Of Interest",
+                            checked = options.showsPointsOfInterest,
+                            onCheckedChange = { options = options.copy(showsPointsOfInterest = it) }
+                        )
+                        ToggleRow(
+                            label = "Zoom Control",
+                            checked = options.showsZoomControl,
+                            onCheckedChange = { options = options.copy(showsZoomControl = it) }
+                        )
+                        ToggleRow(
+                            label = "Map Type Control",
+                            checked = options.showsMapTypeControl,
+                            onCheckedChange = { options = options.copy(showsMapTypeControl = it) }
+                        )
+                        ToggleRow(
+                            label = "Rotate Enabled",
+                            checked = options.isRotateEnabled,
+                            onCheckedChange = { options = options.copy(isRotateEnabled = it) }
+                        )
+                        ToggleRow(
+                            label = "Scroll Enabled",
+                            checked = options.isScrollEnabled,
+                            onCheckedChange = { options = options.copy(isScrollEnabled = it) }
+                        )
+                        ToggleRow(
+                            label = "Zoom Enabled",
+                            checked = options.isZoomEnabled,
+                            onCheckedChange = { options = options.copy(isZoomEnabled = it) }
+                        )
+                        ToggleRow(
+                            label = "Pitch Enabled",
+                            checked = options.isPitchEnabled,
+                            onCheckedChange = { options = options.copy(isPitchEnabled = it) }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConfigSectionHeader(
+    title: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Switch(checked = expanded, onCheckedChange = onExpandedChange)
     }
 }
 
