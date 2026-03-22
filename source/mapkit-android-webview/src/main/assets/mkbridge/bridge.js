@@ -275,57 +275,77 @@
     const target = document.getElementById("mapCanvas");
     if (!target) return;
     const activePointers = new Set();
+    let primaryPointerId = null;
+    let pointerDownAt = 0;
+    let moved = false;
+    let longPressFired = false;
+    const moveThresholdSq = 100;
 
     const clearTimer = function () {
       if (state.longPressTimer) {
         clearTimeout(state.longPressTimer);
         state.longPressTimer = null;
       }
+    };
+
+    const resetGestureState = function () {
+      clearTimer();
       state.longPressStart = null;
+      primaryPointerId = null;
+      pointerDownAt = 0;
+      moved = false;
+      longPressFired = false;
     };
 
     target.addEventListener("pointerdown", function (event) {
-      if (event.pointerType && event.pointerType !== "touch") {
-        return;
-      }
       activePointers.add(event.pointerId);
       if (activePointers.size > 1 || !event.isPrimary) {
-        clearTimer();
+        resetGestureState();
         return;
       }
-      clearTimer();
+      resetGestureState();
+      primaryPointerId = event.pointerId;
+      pointerDownAt = Date.now();
       state.longPressStart = { x: event.pageX, y: event.pageY };
       state.longPressTimer = setTimeout(function () {
         if (!state.longPressStart) return;
         const c = pointToCoordinate(state.longPressStart.x, state.longPressStart.y);
         if (!c) return;
+        longPressFired = true;
         emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
       }, 550);
     });
 
     target.addEventListener("pointermove", function (event) {
-      if (event.pointerType && event.pointerType !== "touch") {
-        return;
-      }
-      if (activePointers.size > 1 || !event.isPrimary) {
-        clearTimer();
+      if (activePointers.size > 1 || !event.isPrimary || event.pointerId !== primaryPointerId) {
+        resetGestureState();
         return;
       }
       if (!state.longPressStart || !state.longPressTimer) return;
       const dx = event.pageX - state.longPressStart.x;
       const dy = event.pageY - state.longPressStart.y;
       const moveSq = dx * dx + dy * dy;
-      if (moveSq > 100) {
+      if (moveSq > moveThresholdSq) {
+        moved = true;
         clearTimer();
       }
     });
 
     const onPointerEnd = function (event) {
-      if (event.pointerType && event.pointerType !== "touch") {
-        return;
-      }
       activePointers.delete(event.pointerId);
-      clearTimer();
+      if (event.pointerId === primaryPointerId && state.longPressStart) {
+        const duration = Date.now() - pointerDownAt;
+        const c = pointToCoordinate(event.pageX, event.pageY) ||
+          pointToCoordinate(state.longPressStart.x, state.longPressStart.y);
+        if (!longPressFired && !moved && duration < 550 && c) {
+          const now = Date.now();
+          if (now - state.lastMapTapAt >= 180) {
+            state.lastMapTapAt = now;
+            emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
+          }
+        }
+      }
+      resetGestureState();
     };
     target.addEventListener("pointerup", onPointerEnd);
     target.addEventListener("pointercancel", onPointerEnd);
@@ -358,24 +378,6 @@
         emitBridgeError(e && e.message ? e.message : e);
       }
     });
-
-    const emitMapTapEvent = function (event) {
-      try {
-        if (!event) return;
-        if (event.annotation || event.overlay) return;
-        let c = event.coordinate;
-        if (!c && typeof event.pointOnPage !== "undefined" && event.pointOnPage) {
-          c = pointToCoordinate(event.pointOnPage.x, event.pointOnPage.y);
-        }
-        if (!c) return;
-        const now = Date.now();
-        if (now - state.lastMapTapAt < 180) return;
-        state.lastMapTapAt = now;
-        emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
-      } catch (_) {}
-    };
-    state.map.addEventListener("single-tap", emitMapTapEvent);
-    state.map.addEventListener("click", emitMapTapEvent);
 
     setupLongPressDetection();
   }
