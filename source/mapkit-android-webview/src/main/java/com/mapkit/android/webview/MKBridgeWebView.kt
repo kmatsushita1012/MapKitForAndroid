@@ -11,9 +11,12 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.mapkit.android.model.MKCoordinate
 import com.mapkit.android.model.MKCoordinateRegion
+import com.mapkit.android.model.MKCircleOverlay
 import com.mapkit.android.model.MKMapErrorCause
 import com.mapkit.android.model.MKMapEvent
 import com.mapkit.android.model.MKMapState
+import com.mapkit.android.model.MKPolygonOverlay
+import com.mapkit.android.model.MKPolylineOverlay
 import com.mapkit.android.webview.internal.InternalMapState
 import com.mapkit.android.webview.internal.MKBridgeMapper
 import com.mapkit.android.webview.internal.approximatelyEquals
@@ -163,7 +166,7 @@ class MKBridgeWebView @JvmOverloads constructor(
                     .put("id", overlay.id)
                     .put("type", overlay::class.simpleName)
                 when (overlay) {
-                    is com.mapkit.android.model.MKPolylineOverlay -> {
+                    is MKPolylineOverlay -> {
                         overlayJson.put(
                             "points",
                             JSONArray().apply {
@@ -176,6 +179,29 @@ class MKBridgeWebView @JvmOverloads constructor(
                             .put("strokeColor", overlay.style.strokeColorHex)
                             .put("strokeWidth", overlay.style.strokeWidth)
                     }
+                    is MKPolygonOverlay -> {
+                        overlayJson.put(
+                            "points",
+                            JSONArray().apply {
+                                overlay.points.forEach { point ->
+                                    put(JSONObject().put("lat", point.latitude).put("lng", point.longitude))
+                                }
+                            }
+                        )
+                        overlayJson
+                            .put("strokeColor", overlay.style.strokeColorHex)
+                            .put("strokeWidth", overlay.style.strokeWidth)
+                            .put("fillColor", overlay.style.fillColorHex)
+                    }
+                    is MKCircleOverlay -> {
+                        overlayJson
+                            .put("centerLat", overlay.center.latitude)
+                            .put("centerLng", overlay.center.longitude)
+                            .put("radiusMeter", overlay.radiusMeter)
+                            .put("strokeColor", overlay.style.strokeColorHex)
+                            .put("strokeWidth", overlay.style.strokeWidth)
+                            .put("fillColor", overlay.style.fillColorHex)
+                    }
                     else -> Unit
                 }
                 put(overlayJson)
@@ -186,7 +212,18 @@ class MKBridgeWebView @JvmOverloads constructor(
             .put("region", regionJson)
             .put("annotations", annotations)
             .put("overlays", overlays)
+            .put("mapStyle", state.options.mapStyle.name)
+            .put("navigationEmphasis", state.options.navigationEmphasis.name)
             .put("showsTraffic", state.options.showsTraffic)
+            .put("showsCompass", state.options.showsCompass)
+            .put("showsScale", state.options.showsScale)
+            .put("showsPointsOfInterest", state.options.showsPointsOfInterest)
+            .put("isRotateEnabled", state.options.isRotateEnabled)
+            .put("isScrollEnabled", state.options.isScrollEnabled)
+            .put("isZoomEnabled", state.options.isZoomEnabled)
+            .put("isPitchEnabled", state.options.isPitchEnabled)
+            .put("appearance", state.options.appearance.name)
+            .put("language", state.options.language.name)
             .put("userLocationEnabled", state.options.userLocation.isEnabled)
             .put("userLocationFollowsHeading", state.options.userLocation.followsHeading)
             .put("userLocationShowsAccuracyRing", state.options.userLocation.showsAccuracyRing)
@@ -209,6 +246,12 @@ class MKBridgeWebView @JvmOverloads constructor(
                 val settled = json.optBoolean("settled", true)
                 MKMapEvent.RegionDidChange(MKBridgeMapper.toRegion(internal), settled = settled)
             }
+            "longPress" -> MKMapEvent.LongPress(
+                coordinate = MKCoordinate(
+                    latitude = json.getDouble("lat"),
+                    longitude = json.getDouble("lng")
+                )
+            )
 
             "annotationTapped" -> MKMapEvent.AnnotationTapped(json.getString("id"))
             "overlayTapped" -> MKMapEvent.OverlayTapped(json.getString("id"))

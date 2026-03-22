@@ -9,6 +9,18 @@
       latDelta: 0.05,
       lngDelta: 0.05,
     },
+    mapStyle: "standard",
+    navigationEmphasis: "none",
+    appearance: "auto",
+    language: "auto",
+    showsTraffic: false,
+    showsCompass: true,
+    showsScale: false,
+    showsPointsOfInterest: true,
+    isRotateEnabled: true,
+    isScrollEnabled: true,
+    isZoomEnabled: true,
+    isPitchEnabled: true,
     annotations: [],
     overlays: [],
     userLocation: null,
@@ -20,8 +32,9 @@
     overlaysById: {},
     annotationHashesById: {},
     overlayHashesById: {},
+    longPressTimer: null,
+    longPressStart: null,
   };
-  const DEBUG_EMIT_TO_ANDROID = false;
 
   function emit(payload) {
     if (window.AndroidMKBridge && window.AndroidMKBridge.emitEvent) {
@@ -30,12 +43,8 @@
   }
 
   function debugLog(message) {
-    const text = "[MKBridgeJS] " + message;
     try {
-      console.log(text);
-      if (DEBUG_EMIT_TO_ANDROID) {
-        emit({ type: "debug", message: text });
-      }
+      console.log("[MKBridgeJS] " + message);
     } catch (_) {}
   }
 
@@ -52,15 +61,41 @@
     status.textContent =
       "mode: " + (state.mapReady ? "mapkit" : "not-ready") + "\n" +
       "center: " + state.region.centerLat.toFixed(6) + ", " + state.region.centerLng.toFixed(6) + "\n" +
-      "span: " + state.region.latDelta.toFixed(5) + ", " + state.region.lngDelta.toFixed(5) + "\n" +
-      "annotations: " + Object.keys(state.annotationsById).length + "\n" +
-      "overlays: " + Object.keys(state.overlaysById).length + "\n" +
-      "userLocation: " + (state.userLocation ? "set" : "unset") + "\n" +
-      "token: " + (state.token ? "set" : "unset");
+      "span: " + state.region.latDelta.toFixed(5) + ", " + state.region.lngDelta.toFixed(5);
   }
 
   function stableHash(value) {
     return JSON.stringify(value);
+  }
+
+  function mapTypeFor(style) {
+    if (!window.mapkit || !window.mapkit.Map || !window.mapkit.Map.MapTypes) return null;
+    const types = window.mapkit.Map.MapTypes;
+    switch (style) {
+      case "mutedStandard":
+        return types.MutedStandard || types.Standard;
+      case "satellite":
+        return types.Satellite;
+      case "hybrid":
+        return types.Hybrid;
+      case "standard":
+      default:
+        return types.Standard;
+    }
+  }
+
+  function colorSchemeFor(appearance) {
+    if (!window.mapkit || !window.mapkit.Map || !window.mapkit.Map.ColorSchemes) return null;
+    const schemes = window.mapkit.Map.ColorSchemes;
+    switch (appearance) {
+      case "dark":
+        return schemes.Dark;
+      case "light":
+        return schemes.Light;
+      case "auto":
+      default:
+        return schemes.Adaptive || null;
+    }
   }
 
   function loadMapKitScriptIfNeeded() {
@@ -85,6 +120,58 @@
     });
   }
 
+  function pointToCoordinate(pageX, pageY) {
+    if (!state.map || !window.mapkit) return null;
+    try {
+      const point = new window.mapkit.Point(pageX, pageY);
+      if (typeof state.map.convertPointOnPageToCoordinate === "function") {
+        return state.map.convertPointOnPageToCoordinate(point);
+      }
+      if (typeof state.map.convertPointToCoordinate === "function") {
+        return state.map.convertPointToCoordinate(point);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function setupLongPressDetection() {
+    const target = document.getElementById("mapCanvas");
+    if (!target) return;
+
+    const clearTimer = function () {
+      if (state.longPressTimer) {
+        clearTimeout(state.longPressTimer);
+        state.longPressTimer = null;
+      }
+      state.longPressStart = null;
+    };
+
+    target.addEventListener("pointerdown", function (event) {
+      clearTimer();
+      state.longPressStart = { x: event.pageX, y: event.pageY };
+      state.longPressTimer = setTimeout(function () {
+        if (!state.longPressStart) return;
+        const c = pointToCoordinate(state.longPressStart.x, state.longPressStart.y);
+        if (!c) return;
+        emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
+      }, 550);
+    });
+
+    target.addEventListener("pointermove", function (event) {
+      if (!state.longPressStart || !state.longPressTimer) return;
+      const dx = event.pageX - state.longPressStart.x;
+      const dy = event.pageY - state.longPressStart.y;
+      const moveSq = dx * dx + dy * dy;
+      if (moveSq > 100) {
+        clearTimer();
+      }
+    });
+
+    target.addEventListener("pointerup", clearTimer);
+    target.addEventListener("pointercancel", clearTimer);
+    target.addEventListener("pointerleave", clearTimer);
+  }
+
   function attachMapEvents() {
     if (!state.map) return;
     state.map.addEventListener("region-change-start", function () {
@@ -94,6 +181,7 @@
         emitBridgeError(e && e.message ? e.message : e);
       }
     });
+
     state.map.addEventListener("region-change-end", function () {
       try {
         const r = state.map.region;
@@ -110,6 +198,8 @@
         emitBridgeError(e && e.message ? e.message : e);
       }
     });
+
+    setupLongPressDetection();
   }
 
   function applyMapKitRegion(region) {
@@ -166,14 +256,35 @@
     });
   }
 
+  function applyOverlayStyle(item) {
+    return new window.mapkit.Style({
+      lineWidth: item.strokeWidth || 3,
+      strokeColor: item.strokeColor || "#0EA5E9",
+      fillColor: item.fillColor || undefined,
+    });
+  }
+
   function buildPolyline(item) {
     const points = (item.points || []).map((p) => new window.mapkit.Coordinate(p.lat, p.lng));
     if (!points.length) return null;
     return new window.mapkit.PolylineOverlay(points, {
-      style: new window.mapkit.Style({
-        lineWidth: item.strokeWidth || 4,
-        strokeColor: item.strokeColor || "#0EA5E9",
-      }),
+      style: applyOverlayStyle(item),
+    });
+  }
+
+  function buildPolygon(item) {
+    const points = (item.points || []).map((p) => new window.mapkit.Coordinate(p.lat, p.lng));
+    if (points.length < 3) return null;
+    return new window.mapkit.PolygonOverlay(points, {
+      style: applyOverlayStyle(item),
+    });
+  }
+
+  function buildCircle(item) {
+    if (typeof item.centerLat === "undefined" || typeof item.centerLng === "undefined") return null;
+    const center = new window.mapkit.Coordinate(item.centerLat, item.centerLng);
+    return new window.mapkit.CircleOverlay(center, item.radiusMeter || 100, {
+      style: applyOverlayStyle(item),
     });
   }
 
@@ -208,44 +319,108 @@
       let overlay = null;
       if (item.type === "MKPolylineOverlay") {
         overlay = buildPolyline(item);
+      } else if (item.type === "MKPolygonOverlay") {
+        overlay = buildPolygon(item);
+      } else if (item.type === "MKCircleOverlay") {
+        overlay = buildCircle(item);
       }
       if (!overlay) return;
 
       overlay.data = { id: item.id };
+      if (typeof overlay.addEventListener === "function") {
+        overlay.addEventListener("select", function () {
+          emit({ type: "overlayTapped", id: item.id });
+        });
+      }
       state.map.addOverlay(overlay);
       state.overlaysById[id] = overlay;
       state.overlayHashesById[id] = nextHash;
     });
   }
 
+  function applyMapOptions() {
+    if (!state.mapReady || !state.map) return;
+
+    try {
+      const nextMapType = mapTypeFor(state.mapStyle);
+      if (nextMapType) {
+        state.map.mapType = nextMapType;
+      }
+    } catch (_) {}
+
+    try {
+      const nextScheme = colorSchemeFor(state.appearance);
+      if (nextScheme) {
+        state.map.colorScheme = nextScheme;
+      }
+    } catch (_) {}
+
+    try {
+      state.map.showsTraffic = !!state.showsTraffic;
+    } catch (_) {}
+
+    try {
+      state.map.showsCompass = !!state.showsCompass;
+    } catch (_) {}
+
+    try {
+      state.map.showsScale = !!state.showsScale;
+    } catch (_) {}
+
+    try {
+      if (typeof state.map.showsPointsOfInterest !== "undefined") {
+        state.map.showsPointsOfInterest = !!state.showsPointsOfInterest;
+      }
+    } catch (_) {}
+
+    try {
+      state.map.isRotationEnabled = !!state.isRotateEnabled;
+      state.map.isScrollEnabled = !!state.isScrollEnabled;
+      state.map.isZoomEnabled = !!state.isZoomEnabled;
+      state.map.isPitchEnabled = !!state.isPitchEnabled;
+    } catch (_) {}
+
+    try {
+      if (typeof state.map.showsMapTypeControl !== "undefined") {
+        state.map.showsMapTypeControl = false;
+      }
+    } catch (_) {}
+  }
+
   function initializeMapKit() {
-    // DEBUG_BREAKPOINT_JS_1: init(token) 後にここへ入るか確認
     debugLog("initializeMapKit called");
     return loadMapKitScriptIfNeeded().then(() => {
       if (!window.mapkit) throw new Error("mapkit is unavailable");
       if (!state.token || !String(state.token).startsWith("eyJ")) {
         emitBridgeError("MAPKIT_JS_TOKEN does not look like Apple JWT token (expected prefix: eyJ...)");
       }
-      debugLog("mapkit script loaded");
-      window.mapkit.init({
+
+      const initOptions = {
         authorizationCallback: function (done) {
-          // DEBUG_BREAKPOINT_JS_2: authorizationCallback が呼ばれて token を返せているか
           debugLog("authorizationCallback called");
           done(state.token);
         },
-      });
-      state.map = new window.mapkit.Map("mapCanvas", {
+      };
+      if (state.language && state.language !== "auto") {
+        initOptions.language = state.language;
+      }
+      window.mapkit.init(initOptions);
+
+      const mapCanvasId = "mapCanvas";
+      state.map = new window.mapkit.Map(mapCanvasId, {
         isRotationEnabled: true,
         isZoomEnabled: true,
         isScrollEnabled: true,
-        showsCompass: window.mapkit.FeatureVisibility && window.mapkit.FeatureVisibility.Adaptive,
       });
+
       state.map.addEventListener("error", function (e) {
-        const msg = (e && e.message) ? e.message : "map error";
+        const msg = e && e.message ? e.message : "map error";
         emitBridgeError("MapKit map error: " + msg);
       });
+
       attachMapEvents();
       state.mapReady = true;
+      applyMapOptions();
       debugLog("map instance created");
     });
   }
@@ -270,6 +445,7 @@
       }
       return;
     }
+
     const c = new window.mapkit.Coordinate(state.userLocation.lat, state.userLocation.lng);
     if (!state.userLocationAnnotation) {
       state.userLocationAnnotation = new window.mapkit.MarkerAnnotation(c, { title: "Current Location" });
@@ -284,6 +460,7 @@
   function applyStateToMap() {
     if (!state.mapReady || !state.map) return;
     applyMapKitRegion(state.region);
+    applyMapOptions();
     reconcileAnnotations(state.annotations || []);
     reconcileOverlays(state.overlays || []);
     applyMapUserLocationConfig();
@@ -293,7 +470,6 @@
 
   window.MKBridge = {
     init: function (token) {
-      // DEBUG_BREAKPOINT_JS_3: Kotlin から init(token) が届いているか
       debugLog("init called from kotlin");
       state.token = token;
       initializeMapKit()
@@ -307,11 +483,28 @@
           emitBridgeError(e && e.message ? e.message : e);
         });
     },
+
     applyState: function (payload) {
       debugLog("applyState called");
       if (payload && payload.region) state.region = payload.region;
       if (payload && payload.annotations) state.annotations = payload.annotations;
       if (payload && payload.overlays) state.overlays = payload.overlays;
+
+      if (payload && payload.mapStyle) state.mapStyle = payload.mapStyle;
+      if (payload && payload.navigationEmphasis) state.navigationEmphasis = payload.navigationEmphasis;
+      if (payload && payload.appearance) state.appearance = payload.appearance;
+      if (payload && payload.language) state.language = payload.language;
+      if (payload && typeof payload.showsTraffic !== "undefined") state.showsTraffic = !!payload.showsTraffic;
+      if (payload && typeof payload.showsCompass !== "undefined") state.showsCompass = !!payload.showsCompass;
+      if (payload && typeof payload.showsScale !== "undefined") state.showsScale = !!payload.showsScale;
+      if (payload && typeof payload.showsPointsOfInterest !== "undefined") {
+        state.showsPointsOfInterest = !!payload.showsPointsOfInterest;
+      }
+      if (payload && typeof payload.isRotateEnabled !== "undefined") state.isRotateEnabled = !!payload.isRotateEnabled;
+      if (payload && typeof payload.isScrollEnabled !== "undefined") state.isScrollEnabled = !!payload.isScrollEnabled;
+      if (payload && typeof payload.isZoomEnabled !== "undefined") state.isZoomEnabled = !!payload.isZoomEnabled;
+      if (payload && typeof payload.isPitchEnabled !== "undefined") state.isPitchEnabled = !!payload.isPitchEnabled;
+
       if (payload && typeof payload.userLocationEnabled !== "undefined") {
         state.userLocationEnabled = !!payload.userLocationEnabled;
       }
@@ -321,12 +514,14 @@
       if (payload && typeof payload.userLocationShowsAccuracyRing !== "undefined") {
         state.userLocationShowsAccuracyRing = !!payload.userLocationShowsAccuracyRing;
       }
+
       try {
         applyStateToMap();
       } catch (e) {
         emitBridgeError(e && e.message ? e.message : e);
       }
     },
+
     applyUserLocation: function (payload) {
       if (!payload) return;
       state.userLocation = {
@@ -343,19 +538,21 @@
       emit({ type: "userLocationUpdated", lat: payload.lat, lng: payload.lng });
       renderStatus();
     },
+
     simulatePan: function () {
-      if (state.mapReady) {
-        state.region.centerLat = state.region.centerLat + 0.001;
-        state.region.centerLng = state.region.centerLng + 0.001;
-        applyMapKitRegion(state.region);
-        emit({ type: "regionDidChange", region: state.region, settled: true });
-        renderStatus();
-      }
+      if (!state.mapReady) return;
+      state.region.centerLat = state.region.centerLat + 0.001;
+      state.region.centerLng = state.region.centerLng + 0.001;
+      applyMapKitRegion(state.region);
+      emit({ type: "regionDidChange", region: state.region, settled: true });
+      renderStatus();
     },
+
     simulateAnnotationTap: function () {
       const id = (state.annotations[0] && state.annotations[0].id) || "sample-annotation";
       emit({ type: "annotationTapped", id: id });
     },
+
     simulateOverlayTap: function () {
       const id = (state.overlays[0] && state.overlays[0].id) || "sample-overlay";
       emit({ type: "overlayTapped", id: id });

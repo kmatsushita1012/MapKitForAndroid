@@ -146,6 +146,12 @@ enum class MKAppearanceOption {
     dark
 }
 
+enum class MKMapLanguage {
+    auto,
+    ja,
+    en
+}
+
 data class MKUserLocationOptions(
     val isEnabled: Boolean = false,
     val followsHeading: Boolean = false,
@@ -164,6 +170,7 @@ data class MKMapOptions(
     val isZoomEnabled: Boolean = true,
     val isPitchEnabled: Boolean = true,
     val appearance: MKAppearanceOption = MKAppearanceOption.auto,
+    val language: MKMapLanguage = MKMapLanguage.auto,
     val userLocation: MKUserLocationOptions = MKUserLocationOptions()
 )
 
@@ -184,6 +191,7 @@ sealed interface MKMapEvent {
     data object MapLoaded : MKMapEvent
     data class MapError(val cause: MKMapErrorCause) : MKMapEvent
     data class RegionDidChange(val region: MKCoordinateRegion, val settled: Boolean) : MKMapEvent
+    data class LongPress(val coordinate: MKCoordinate) : MKMapEvent
     data class AnnotationTapped(val id: String) : MKMapEvent
     data class OverlayTapped(val id: String) : MKMapEvent
     data class UserLocationUpdated(val coordinate: MKCoordinate) : MKMapEvent

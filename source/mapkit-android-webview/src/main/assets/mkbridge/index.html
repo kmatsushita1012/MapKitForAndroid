@@ -5,24 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.css" />
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; background: #f4f7fb; }
-      #map { height: 100%; display: grid; grid-template-rows: auto 1fr; }
-      #header { padding: 10px 12px; background: #0f172a; color: #fff; font-size: 13px; }
-      #canvas { margin: 12px; border-radius: 12px; border: 1px solid #cbd5e1; padding: 0; overflow: hidden; position: relative; min-height: 360px; }
-      #mapCanvas { width: 100%; height: 100%; min-height: 360px; background: transparent; }
-      #statusWrap { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px; background: rgba(255,255,255,0.82); backdrop-filter: blur(2px); }
-      #status { font-size: 12px; color: #334155; white-space: pre-wrap; }
+      html, body { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; }
+      #mapCanvas { width: 100vw; height: 100vh; }
+      #statusWrap { display: none; }
     </style>
   </head>
   <body>
-    <div id="map">
-      <div id="header">MK Bridge WebView</div>
-      <div id="canvas">
-        <div id="mapCanvas"></div>
-        <div id="statusWrap">
-          <div id="status">loading...</div>
-        </div>
-      </div>
+    <div id="mapCanvas"></div>
+    <div id="statusWrap">
+      <div id="status">loading...</div>
     </div>
     <script src="./bridge.js"></script>
   </body>
