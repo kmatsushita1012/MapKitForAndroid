@@ -487,6 +487,12 @@
     if (item.isSelected && typeof annotation.selected !== "undefined") {
       annotation.selected = true;
     }
+    if (typeof annotation.addEventListener === "function") {
+      annotation.addEventListener("select", function () {
+        debugLog("emit annotationTapped(annotation.select) id=" + item.id);
+        emit({ type: "annotationTapped", id: item.id });
+      });
+    }
     return annotation;
   }
 
@@ -597,6 +603,12 @@
       if (!overlay) return;
 
       overlay.data = { id: item.id };
+      if (typeof overlay.addEventListener === "function") {
+        overlay.addEventListener("select", function () {
+          debugLog("emit overlayTapped(overlay.select) id=" + item.id);
+          emit({ type: "overlayTapped", id: item.id });
+        });
+      }
       state.map.addOverlay(overlay);
       state.overlaysById[id] = overlay;
       state.overlayHashesById[id] = nextHash;
