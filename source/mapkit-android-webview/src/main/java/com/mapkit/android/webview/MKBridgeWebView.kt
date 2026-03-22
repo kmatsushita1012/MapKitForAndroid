@@ -27,7 +27,8 @@ class MKBridgeWebView @JvmOverloads constructor(
 
     private var onEvent: ((MKMapEvent) -> Unit)? = null
     private var isPageReady = false
-    private var hasInitCalled = false
+    private var isJsInitSent = false
+    private var pendingToken: String? = null
     private var lastAppliedState: InternalMapState? = null
     private var pendingState: MKMapState? = null
 
@@ -58,9 +59,8 @@ class MKBridgeWebView @JvmOverloads constructor(
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 isPageReady = true
-                if (hasInitCalled) {
-                    flushPendingState()
-                }
+                sendInitIfPossible()
+                flushPendingState()
             }
         }
         addJavascriptInterface(androidBridge, "AndroidMKBridge")
@@ -72,16 +72,13 @@ class MKBridgeWebView @JvmOverloads constructor(
     }
 
     fun ensureInitialized(token: String) {
-        if (hasInitCalled) return
-        hasInitCalled = true
-        if (!isPageReady) return
-        val escaped = JSONObject.quote(token)
-        evaluateJavascriptSafe("window.MKBridge && window.MKBridge.init($escaped);")
+        pendingToken = token
+        sendInitIfPossible()
     }
 
     fun applyState(state: MKMapState) {
         pendingState = state
-        if (!isPageReady || !hasInitCalled) return
+        if (!isPageReady || !isJsInitSent) return
         flushPendingState()
     }
 
@@ -90,7 +87,7 @@ class MKBridgeWebView @JvmOverloads constructor(
         followsHeading: Boolean,
         showsAccuracyRing: Boolean
     ) {
-        if (!isPageReady || !hasInitCalled) return
+        if (!isPageReady || !isJsInitSent) return
         val payload = JSONObject()
             .put("lat", coordinate.latitude)
             .put("lng", coordinate.longitude)
@@ -102,12 +99,21 @@ class MKBridgeWebView @JvmOverloads constructor(
 
     private fun flushPendingState() {
         val latest = pendingState ?: return
+        if (!isPageReady || !isJsInitSent) return
         val latestInternal = MKBridgeMapper.toInternal(latest)
         if (lastAppliedState?.approximatelyEquals(latestInternal) == true) return
 
         val payload = serializeState(latest)
         evaluateJavascriptSafe("window.MKBridge && window.MKBridge.applyState($payload);")
         lastAppliedState = latestInternal
+    }
+
+    private fun sendInitIfPossible() {
+        if (!isPageReady || isJsInitSent) return
+        val token = pendingToken ?: return
+        val escaped = JSONObject.quote(token)
+        evaluateJavascriptSafe("window.MKBridge && window.MKBridge.init($escaped);")
+        isJsInitSent = true
     }
 
     private fun evaluateJavascriptSafe(script: String) {
