@@ -83,10 +83,6 @@ class MKBridgeWebView @JvmOverloads constructor(
         settings.useWideViewPort = true
         isLongClickable = false
         setOnLongClickListener { true }
-        setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
-            false
-        }
         webChromeClient = WebChromeClient()
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -153,6 +149,11 @@ class MKBridgeWebView @JvmOverloads constructor(
 
     private fun evaluateJavascriptSafe(script: String) {
         evaluateJavascript(script, ValueCallback { })
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        gestureDetector.onTouchEvent(event)
+        return super.onTouchEvent(event)
     }
 
     private fun emitGestureToJs(type: String, x: Double, y: Double) {
