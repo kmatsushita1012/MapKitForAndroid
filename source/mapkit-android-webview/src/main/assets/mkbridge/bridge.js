@@ -273,6 +273,7 @@
   function setupLongPressDetection() {
     const target = document.getElementById("mapCanvas");
     if (!target) return;
+    const activePointers = new Set();
 
     const clearTimer = function () {
       if (state.longPressTimer) {
@@ -283,6 +284,11 @@
     };
 
     target.addEventListener("pointerdown", function (event) {
+      activePointers.add(event.pointerId);
+      if (activePointers.size > 1 || !event.isPrimary) {
+        clearTimer();
+        return;
+      }
       clearTimer();
       state.longPressStart = { x: event.pageX, y: event.pageY };
       state.longPressTimer = setTimeout(function () {
@@ -294,6 +300,10 @@
     });
 
     target.addEventListener("pointermove", function (event) {
+      if (activePointers.size > 1 || !event.isPrimary) {
+        clearTimer();
+        return;
+      }
       if (!state.longPressStart || !state.longPressTimer) return;
       const dx = event.pageX - state.longPressStart.x;
       const dy = event.pageY - state.longPressStart.y;
@@ -303,9 +313,13 @@
       }
     });
 
-    target.addEventListener("pointerup", clearTimer);
-    target.addEventListener("pointercancel", clearTimer);
-    target.addEventListener("pointerleave", clearTimer);
+    const onPointerEnd = function (event) {
+      activePointers.delete(event.pointerId);
+      clearTimer();
+    };
+    target.addEventListener("pointerup", onPointerEnd);
+    target.addEventListener("pointercancel", onPointerEnd);
+    target.addEventListener("pointerleave", onPointerEnd);
   }
 
   function attachMapEvents() {
