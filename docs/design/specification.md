@@ -154,11 +154,12 @@
 
 #### 4.1.3 スタイル
 - Annotation:
-- `DefaultPin`
-- `DefaultMarker(tint, glyphText?)`
-- `Custom(key, params)`
+- `Default(tint, glyphText?, glyphImageSource?)` (MKMarkerAnnotationView 相当)
+- `CustomImage(source, width, height, anchor)` (MKAnnotationView 相当)
 - Overlay:
 - `strokeColor`, `strokeWidth`, `fillColor`, `lineDashPattern`
+- 注記: Polygon/Circle の `fillColor` alpha は MapKit JS レンダラ依存で、
+  alpha=1.0 相当でも完全不透明に見えない場合がある。
 
 #### 4.1.4 イベント
 - `AnnotationTapped(id)`

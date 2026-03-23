@@ -14,7 +14,7 @@ data class MKAnnotation(
     val subtitle: String? = null,
     val isVisible: Boolean = true,
     val isSelected: Boolean = false,
-    val style: MKAnnotationStyle = MKAnnotationStyle.DefaultMarker()
+    val style: MKAnnotationStyle = MKAnnotationStyle.Default()
 )
 
 sealed interface MKImageSource {
@@ -24,12 +24,12 @@ sealed interface MKImageSource {
 }
 
 sealed interface MKAnnotationStyle {
-    data class DefaultPin(val tintHex: String? = null) : MKAnnotationStyle
-    data class DefaultMarker(
+    data class Default(
         val tintHex: String? = null,
-        val glyphText: String? = null
+        val glyphText: String? = null,
+        val glyphImageSource: MKImageSource? = null
     ) : MKAnnotationStyle
-    data class Image(
+    data class CustomImage(
         val source: MKImageSource,
         val widthDp: Int,
         val heightDp: Int,
@@ -126,7 +126,7 @@ data class MKUserLocationOptions(
 - 内部モデルには `MK` 接頭辞を付けない。
 
 ### 3. カスタム画像描画方式
-- `MKAnnotationStyle.Image` は以下で描画する。
+- `MKAnnotationStyle.CustomImage` は以下で描画する。
 - `Url`: JS 側 `img.src` に URL を設定して描画。
 - `Base64Png`: `data:image/png;base64,...` へ変換して描画。
 - `ResourceName`: Android リソースを base64 化して JS へ渡し描画。
@@ -140,3 +140,8 @@ data class MKUserLocationOptions(
 - Android `FusedLocationProviderClient` で位置取得。
 - 更新を Bridge 経由で JS に渡し、`showsUserLocation` 相当の表示を同期。
 - 権限状態の変化時は内部で追従し、必要なら `MapError` を通知する。
+
+### 6. Polygon/Circle fill alpha の既知制約
+- Polygon と Circle の `fillColor` は alpha 指定を渡しても、MapKit JS 側の描画特性により「完全不透明」に見えない場合がある。
+- 実装では `rgba(...)` を明示して渡すが、最終描画は WebGL/MapKit JS のレンダラ依存。
+- そのため仕様上は「alpha が効く」ことを保証しつつ、見た目の上限は実行環境依存であることを明記する。
