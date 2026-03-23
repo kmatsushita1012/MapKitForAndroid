@@ -870,20 +870,35 @@
 
     emitGestureAt: function (pageX, pageY, type) {
       if (!state.mapReady) return;
-      const c = pointToCoordinate(Number(pageX), Number(pageY)) || fallbackCoordinate();
+      const dpr = (window && window.devicePixelRatio) ? Number(window.devicePixelRatio) : 1;
+      const nx = Number(pageX) / (dpr > 0 ? dpr : 1);
+      const ny = Number(pageY) / (dpr > 0 ? dpr : 1);
+      const c = pointToCoordinate(nx, ny) || fallbackCoordinate();
       if (!c) {
         debugLog("emitGestureAt skipped: no coordinate for type=" + String(type));
         return;
       }
       if (type === "longPress") {
-        debugLog("emit longPress lat=" + c.latitude + " lng=" + c.longitude);
+        debugLog(
+          "emit longPress lat=" + c.latitude +
+          " lng=" + c.longitude +
+          " raw=(" + pageX + "," + pageY + ")" +
+          " norm=(" + nx + "," + ny + ")" +
+          " dpr=" + dpr
+        );
         emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
         return;
       }
       const now = Date.now();
       if (now - state.lastMapTapAt < 180) return;
       state.lastMapTapAt = now;
-      debugLog("emit mapTapped lat=" + c.latitude + " lng=" + c.longitude);
+      debugLog(
+        "emit mapTapped lat=" + c.latitude +
+        " lng=" + c.longitude +
+        " raw=(" + pageX + "," + pageY + ")" +
+        " norm=(" + nx + "," + ny + ")" +
+        " dpr=" + dpr
+      );
       emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
     },
 
