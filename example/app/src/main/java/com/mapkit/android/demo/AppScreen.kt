@@ -237,6 +237,12 @@ internal fun AppScreen() {
                             .fillMaxWidth()
                             .height(44.dp)
                     )
+                    EnumSelector(
+                        label = "Tap Action",
+                        value = tapAction,
+                        values = DrawMode.entries,
+                        onSelected = { tapAction = it }
+                    )
                     if (activeDrawMode == DrawMode.Polyline || activeDrawMode == DrawMode.Polygon || activeDrawMode == DrawMode.Circle) {
                         DraftGeometryActionRow(
                             drawMode = activeDrawMode,
@@ -479,12 +485,6 @@ internal fun AppScreen() {
                                     }
                                 )
                             }
-                        )
-                        EnumSelector(
-                            label = "Tap Action",
-                            value = tapAction,
-                            values = DrawMode.entries,
-                            onSelected = { tapAction = it }
                         )
                         EnumSelector(
                             label = "Long Press Action",
