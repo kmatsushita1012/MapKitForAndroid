@@ -14,7 +14,7 @@
     language: "auto",
     showsCompass: true,
     showsScale: false,
-    showsZoomControl: false,
+    showsZoomControl: true,
     showsMapTypeControl: false,
     showsPointsOfInterest: true,
     poiFilter: { type: "all", categories: [] },
@@ -36,6 +36,7 @@
     overlayHashesById: {},
     longPressTimer: null,
     longPressStart: null,
+    longPressHandlersInstalled: false,
     lastMapTapAt: 0,
   };
 
@@ -260,10 +261,14 @@
   function pointToCoordinate(pageX, pageY) {
     if (!state.map || !window.mapkit) return null;
     try {
-      const point = new window.mapkit.Point(pageX, pageY);
       if (typeof state.map.convertPointOnPageToCoordinate === "function") {
-        return state.map.convertPointOnPageToCoordinate(point);
+        const domPoint =
+          (typeof DOMPoint !== "undefined")
+            ? new DOMPoint(pageX, pageY)
+            : { x: pageX, y: pageY };
+        return state.map.convertPointOnPageToCoordinate(domPoint);
       }
+      const point = new window.mapkit.Point(pageX, pageY);
       if (typeof state.map.convertPointToCoordinate === "function") {
         return state.map.convertPointToCoordinate(point);
       }
@@ -271,18 +276,12 @@
     return null;
   }
 
-  function fallbackCoordinate() {
-    try {
-      if (!state.map || !state.map.region || !state.map.region.center) return null;
-      return state.map.region.center;
-    } catch (_) {}
-    return null;
-  }
-
   function setupLongPressDetection() {
-    const target = document.getElementById("mapCanvas");
+    const target = state.map && state.map.element ? state.map.element : null;
     if (!target) return;
-    const activePointers = new Set();
+    if (state.longPressHandlersInstalled) return;
+    state.longPressHandlersInstalled = true;
+
     let primaryPointerId = null;
     let pointerDownAt = 0;
     let moved = false;
@@ -305,18 +304,8 @@
       longPressFired = false;
     };
 
-    const isInsideMapCanvas = function (event) {
-      if (!event) return false;
-      const rect = target.getBoundingClientRect();
-      const x = (typeof event.clientX === "number") ? event.clientX : 0;
-      const y = (typeof event.clientY === "number") ? event.clientY : 0;
-      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-    };
-
     const onPointerDown = function (event) {
-      if (!isInsideMapCanvas(event)) return;
-      activePointers.add(event.pointerId);
-      if (activePointers.size > 1 || !event.isPrimary) {
+      if (!event.isPrimary) {
         resetGestureState();
         return;
       }
@@ -336,7 +325,7 @@
 
     const onPointerMove = function (event) {
       if (primaryPointerId == null) return;
-      if (activePointers.size > 1 || !event.isPrimary || event.pointerId !== primaryPointerId) {
+      if (!event.isPrimary || event.pointerId !== primaryPointerId) {
         resetGestureState();
         return;
       }
@@ -351,11 +340,7 @@
     };
 
     const onPointerEnd = function (event) {
-      if (primaryPointerId == null) {
-        activePointers.delete(event.pointerId);
-        return;
-      }
-      activePointers.delete(event.pointerId);
+      if (primaryPointerId == null) return;
       if (event.pointerId === primaryPointerId && state.longPressStart) {
         const duration = Date.now() - pointerDownAt;
         const c = pointToCoordinate(event.pageX, event.pageY) ||
@@ -371,8 +356,13 @@
       }
       resetGestureState();
     };
-    const onClick = function (event) {
-      if (!isInsideMapCanvas(event)) return;
+
+    target.addEventListener("pointerdown", onPointerDown);
+    target.addEventListener("pointermove", onPointerMove);
+    target.addEventListener("pointerup", onPointerEnd);
+    target.addEventListener("pointercancel", onPointerEnd);
+
+    target.addEventListener("click", function (event) {
       if (primaryPointerId != null) return;
       const c = pointToCoordinate(event.pageX, event.pageY);
       if (!c) return;
@@ -381,13 +371,7 @@
       state.lastMapTapAt = now;
       debugLog("emit mapTapped(click) lat=" + c.latitude + " lng=" + c.longitude);
       emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
-    };
-
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("pointermove", onPointerMove, true);
-    document.addEventListener("pointerup", onPointerEnd, true);
-    document.addEventListener("pointercancel", onPointerEnd, true);
-    document.addEventListener("click", onClick, true);
+    });
   }
 
   function attachMapEvents() {
@@ -431,28 +415,7 @@
       } catch (_) {}
     });
 
-    const mapTapLikeEvents = ["single-tap", "long-press", "double-tap", "click"];
-    mapTapLikeEvents.forEach(function (name) {
-      state.map.addEventListener(name, function (event) {
-        try {
-          debugLog("map event fired: " + name);
-          if (event && event.annotation) return;
-          if (event && event.overlay) return;
-          let c = event && event.coordinate ? event.coordinate : null;
-          if (!c && event && event.pointOnPage) {
-            c = pointToCoordinate(event.pointOnPage.x, event.pointOnPage.y);
-          }
-          if (!c) return;
-          if (name === "long-press") {
-            emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
-          } else if (name === "single-tap" || name === "click") {
-            emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
-          }
-        } catch (_) {}
-      });
-    });
-
-    // Gesture input is emitted from Android WebView touch detector via emitGestureAt().
+    setupLongPressDetection();
   }
 
   function applyMapKitRegion(region) {
@@ -866,40 +829,6 @@
       applyUserLocationPoint();
       emit({ type: "userLocationUpdated", lat: payload.lat, lng: payload.lng });
       renderStatus();
-    },
-
-    emitGestureAt: function (pageX, pageY, type) {
-      if (!state.mapReady) return;
-      const dpr = (window && window.devicePixelRatio) ? Number(window.devicePixelRatio) : 1;
-      const nx = Number(pageX) / (dpr > 0 ? dpr : 1);
-      const ny = Number(pageY) / (dpr > 0 ? dpr : 1);
-      const c = pointToCoordinate(nx, ny) || fallbackCoordinate();
-      if (!c) {
-        debugLog("emitGestureAt skipped: no coordinate for type=" + String(type));
-        return;
-      }
-      if (type === "longPress") {
-        debugLog(
-          "emit longPress lat=" + c.latitude +
-          " lng=" + c.longitude +
-          " raw=(" + pageX + "," + pageY + ")" +
-          " norm=(" + nx + "," + ny + ")" +
-          " dpr=" + dpr
-        );
-        emit({ type: "longPress", lat: c.latitude, lng: c.longitude });
-        return;
-      }
-      const now = Date.now();
-      if (now - state.lastMapTapAt < 180) return;
-      state.lastMapTapAt = now;
-      debugLog(
-        "emit mapTapped lat=" + c.latitude +
-        " lng=" + c.longitude +
-        " raw=(" + pageX + "," + pageY + ")" +
-        " norm=(" + nx + "," + ny + ")" +
-        " dpr=" + dpr
-      );
-      emit({ type: "mapTapped", lat: c.latitude, lng: c.longitude });
     },
 
     simulatePan: function () {

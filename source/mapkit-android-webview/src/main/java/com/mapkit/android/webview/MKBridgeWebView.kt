@@ -4,8 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
 import android.util.Log
-import android.view.GestureDetector
-import android.view.MotionEvent
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -39,20 +37,6 @@ class MKBridgeWebView @JvmOverloads constructor(
     private var pendingToken: String? = null
     private var lastAppliedPayload: String? = null
     private var pendingState: MKMapState? = null
-    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(e: MotionEvent): Boolean = true
-
-        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-            Log.d("MKBridgeWebView", "gesture onSingleTapConfirmed x=${e.x} y=${e.y}")
-            emitGestureToJs(type = "tap", x = e.x.toDouble(), y = e.y.toDouble())
-            return false
-        }
-
-        override fun onLongPress(e: MotionEvent) {
-            Log.d("MKBridgeWebView", "gesture onLongPress x=${e.x} y=${e.y}")
-            emitGestureToJs(type = "longPress", x = e.x.toDouble(), y = e.y.toDouble())
-        }
-    })
 
     private val androidBridge = object {
         @JavascriptInterface
@@ -149,20 +133,6 @@ class MKBridgeWebView @JvmOverloads constructor(
 
     private fun evaluateJavascriptSafe(script: String) {
         evaluateJavascript(script, ValueCallback { })
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        gestureDetector.onTouchEvent(event)
-        return super.onTouchEvent(event)
-    }
-
-    private fun emitGestureToJs(type: String, x: Double, y: Double) {
-        if (!isPageReady || !isJsInitSent) return
-        Log.d("MKBridgeWebView", "emitGestureToJs type=$type x=$x y=$y")
-        val payloadType = JSONObject.quote(type)
-        evaluateJavascriptSafe(
-            "window.MKBridge && window.MKBridge.emitGestureAt($x, $y, $payloadType);"
-        )
     }
 
     fun simulateAnnotationTap() {
