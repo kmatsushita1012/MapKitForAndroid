@@ -25,11 +25,10 @@
     isPitchEnabled: true,
     annotations: [],
     overlays: [],
-    userLocation: null,
     userLocationEnabled: false,
     userLocationFollowsHeading: false,
     userLocationShowsAccuracyRing: true,
-    userLocationAnnotation: null,
+    userLocationWatchId: null,
     annotationsById: {},
     overlaysById: {},
     annotationHashesById: {},
@@ -715,28 +714,35 @@
         state.map.showsUserLocation = !!state.userLocationEnabled;
       }
     } catch (_) {}
-  }
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
 
-  function applyUserLocationPoint() {
-    if (!state.mapReady || !state.map) return;
-    if (!state.userLocationEnabled || !state.userLocation) {
-      if (state.userLocationAnnotation) {
-        try {
-          state.map.removeAnnotation(state.userLocationAnnotation);
-        } catch (_) {}
-        state.userLocationAnnotation = null;
-      }
-      return;
+    if (state.userLocationEnabled && state.userLocationWatchId == null) {
+      state.userLocationWatchId = navigator.geolocation.watchPosition(
+        function (position) {
+          if (!position || !position.coords) return;
+          emit({
+            type: "userLocationUpdated",
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        function (error) {
+          const reason = error && error.message ? error.message : "unknown geolocation error";
+          emitBridgeError("geolocation watchPosition failed: " + reason);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000,
+        }
+      );
     }
 
-    const c = new window.mapkit.Coordinate(state.userLocation.lat, state.userLocation.lng);
-    if (!state.userLocationAnnotation) {
-      state.userLocationAnnotation = new window.mapkit.MarkerAnnotation(c, { title: "Current Location" });
+    if (!state.userLocationEnabled && state.userLocationWatchId != null) {
       try {
-        state.map.addAnnotation(state.userLocationAnnotation);
+        navigator.geolocation.clearWatch(state.userLocationWatchId);
       } catch (_) {}
-    } else {
-      state.userLocationAnnotation.coordinate = c;
+      state.userLocationWatchId = null;
     }
   }
 
@@ -747,7 +753,6 @@
     reconcileAnnotations(state.annotations || []);
     reconcileOverlays(state.overlays || []);
     applyMapUserLocationConfig();
-    applyUserLocationPoint();
     renderStatus();
   }
 
@@ -813,23 +818,6 @@
       } catch (e) {
         emitBridgeError(e && e.message ? e.message : e);
       }
-    },
-
-    applyUserLocation: function (payload) {
-      if (!payload) return;
-      state.userLocation = {
-        lat: payload.lat,
-        lng: payload.lng,
-      };
-      if (typeof payload.followsHeading !== "undefined") {
-        state.userLocationFollowsHeading = !!payload.followsHeading;
-      }
-      if (typeof payload.showsAccuracyRing !== "undefined") {
-        state.userLocationShowsAccuracyRing = !!payload.showsAccuracyRing;
-      }
-      applyUserLocationPoint();
-      emit({ type: "userLocationUpdated", lat: payload.lat, lng: payload.lng });
-      renderStatus();
     },
 
     simulatePan: function () {

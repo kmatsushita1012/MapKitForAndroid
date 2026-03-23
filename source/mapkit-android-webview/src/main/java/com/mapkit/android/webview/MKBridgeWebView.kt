@@ -1,9 +1,12 @@
 package com.mapkit.android.webview
 
 import android.annotation.SuppressLint
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.AttributeSet
 import android.util.Log
+import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -25,6 +28,7 @@ import com.mapkit.android.model.MKPolygonOverlay
 import com.mapkit.android.model.MKPolylineOverlay
 import com.mapkit.android.webview.internal.InternalMapState
 import com.mapkit.android.webview.internal.MKBridgeMapper
+import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -65,6 +69,7 @@ class MKBridgeWebView @JvmOverloads constructor(
     init {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
+        settings.setGeolocationEnabled(true)
         settings.allowFileAccess = false
         settings.allowContentAccess = false
         settings.setSupportZoom(false)
@@ -73,7 +78,24 @@ class MKBridgeWebView @JvmOverloads constructor(
         settings.useWideViewPort = true
         isLongClickable = false
         setOnLongClickListener { true }
-        webChromeClient = WebChromeClient()
+        webChromeClient = object : WebChromeClient() {
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String?,
+                callback: GeolocationPermissions.Callback?
+            ) {
+                val granted = hasLocationPermission(context)
+                callback?.invoke(origin, granted, false)
+                if (!granted) {
+                    onEvent?.invoke(
+                        MKMapEvent.MapError(
+                            MKMapErrorCause.BridgeFailure(
+                                "Location permission not granted for geolocation origin=$origin"
+                            )
+                        )
+                    )
+                }
+            }
+        }
         webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView,
@@ -107,21 +129,6 @@ class MKBridgeWebView @JvmOverloads constructor(
         pendingState = state
         if (!isPageReady || !isJsInitSent) return
         flushPendingState()
-    }
-
-    fun applyUserLocation(
-        coordinate: MKCoordinate,
-        followsHeading: Boolean,
-        showsAccuracyRing: Boolean
-    ) {
-        if (!isPageReady || !isJsInitSent) return
-        val payload = JSONObject()
-            .put("lat", coordinate.latitude)
-            .put("lng", coordinate.longitude)
-            .put("followsHeading", followsHeading)
-            .put("showsAccuracyRing", showsAccuracyRing)
-            .toString()
-        evaluateJavascriptSafe("window.MKBridge && window.MKBridge.applyUserLocation($payload);")
     }
 
     private fun flushPendingState() {
@@ -158,6 +165,18 @@ class MKBridgeWebView @JvmOverloads constructor(
 
     fun simulatePan() {
         evaluateJavascriptSafe("window.MKBridge && window.MKBridge.simulatePan && window.MKBridge.simulatePan();")
+    }
+
+    private fun hasLocationPermission(context: Context): Boolean {
+        val fine = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        return fine || coarse
     }
 
     private fun serializeState(state: MKMapState): String {
