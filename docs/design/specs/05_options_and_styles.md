@@ -134,7 +134,7 @@ data class ModuleLayout(
         "mapkit-android-webview",
         "mapkit-android-compose"
     ),
-    val exampleModules: List<String> = listOf("demo-app")
+    val exampleModules: List<String> = listOf("example-app")
 )
 ```
 

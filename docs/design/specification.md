@@ -193,23 +193,25 @@
 #### 5.1.1 公開オプション
 - `MapOptions`
 - `mapStyle: MapStyle` (`standard` | `mutedStandard` | `satellite` | `hybrid`)
-- `showsTraffic: Boolean`
 - `showsCompass: Boolean`
 - `showsScale: Boolean`
+- `showsZoomControl: Boolean`
+- `showsMapTypeControl: Boolean`
 - `showsPointsOfInterest: Boolean`
+- `poiFilter: PoiFilter`
+- `cameraZoomRange: CameraZoomRange?`
 - `isRotateEnabled: Boolean`
 - `isScrollEnabled: Boolean`
 - `isZoomEnabled: Boolean`
 - `isPitchEnabled: Boolean`
 - `appearance: AppearanceOption` (`auto` | `light` | `dark`)
+- `language: MapLanguage` (`auto` | `ja` | `en`)
+- `userLocation: UserLocationOptions` (`isEnabled`, `followsHeading`, `showsAccuracyRing`)
 
-#### 5.1.2 移動モード系スタイル
-- `NavigationEmphasis` を公開:
-- `none`
-- `driving`
-- `walking`
-- `transit`
-- 本項目は「描画強調ヒント」であり、経路探索自体は責務外。
+#### 5.1.2 非対応項目
+- `showsTraffic` と `NavigationEmphasis` は公開 API から除外する。
+- 理由: Android WebView + MapKit JS での再現性が安定しないため。
+- 将来再導入する場合は `feature_request` で再定義してから検討する。
 
 #### 5.1.3 配布/設定要件
 - 利用者は環境変数で token 等を設定し、`local.properties` で参照する。
@@ -220,13 +222,11 @@
 ### 5.2 内部仕様
 
 #### 5.2.1 MapKit JS へのマッピング
-- `showsTraffic -> map.showsTraffic`
 - `mapStyle -> map.mapType` 系へ変換
-- UI 表示系(compass/scale 等)は map control 設定へ変換
-- `NavigationEmphasis` は style preset を内部マップ:
-- `driving`: 道路/ラベル強調
-- `walking`: 歩行系 POI 優先
-- `transit`: 交通網表示優先
+- UI 表示系(compass/scale/zoom/mapTypeControl)は map control 設定へ変換
+- `poiFilter` は `pointOfInterestFilter` に変換
+- `cameraZoomRange` は `map.cameraZoomRange` に変換
+- `userLocation` は `showsUserLocation` と bridge 側ユーザー位置注釈に変換
 
 #### 5.2.2 適用順序
 - 初期化直後に `MapOptions` 一括適用。
@@ -236,7 +236,7 @@
 - `source:mapkit-android-core` (公開 API)
 - `source:mapkit-android-webview` (Bridge/Engine)
 - `source:mapkit-android-compose` (Compose ラッパ)
-- `example:demo-app` (利用例)
+- `example:example-app` (利用例)
 
 #### 5.2.4 公開設定
 - `maven-publish` + `signing` を前提。
@@ -250,6 +250,6 @@
 - interactive 操作中の押し戻しが発生しない。
 - Annotation/Overlay が差分更新される。
 - Default 表示 + Custom フックが動作する。
-- Traffic / mapStyle / NavigationEmphasis が反映される。
+- mapStyle / zoomControl / poiFilter / cameraZoomRange / userLocation が反映される。
 - token 未設定時に明示的エラーが返る。
 - `source` と `example` が分離され、example で動作確認可能。

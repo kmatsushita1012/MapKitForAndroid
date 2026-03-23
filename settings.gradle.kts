@@ -23,4 +23,4 @@ rootProject.name = "MapKit for Android"
 include(":source:mapkit-android-core")
 include(":source:mapkit-android-webview")
 include(":source:mapkit-android-compose")
-include(":example:demo-app")
+include(":example:example-app")

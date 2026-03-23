@@ -1,16 +1,8 @@
 package com.mapkit.android.demo
 
 import android.Manifest
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.os.Bundle
 import android.util.Log
-import android.util.Base64
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,12 +23,10 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mapkit.android.api.MKMapKit
 import com.mapkit.android.api.MKMapView
 import com.mapkit.android.model.MKAnnotation
 import com.mapkit.android.model.MKAnnotationStyle
@@ -61,49 +50,15 @@ import com.mapkit.android.model.MKMapOptions
 import com.mapkit.android.model.MKMapState
 import com.mapkit.android.model.MKMapStyle
 import com.mapkit.android.model.MKOverlay
-import com.mapkit.android.model.MKOverlayStyle
 import com.mapkit.android.model.MKPoiFilter
 import com.mapkit.android.model.MKPolygonOverlay
 import com.mapkit.android.model.MKPolylineOverlay
 import com.mapkit.android.model.MKUserLocationOptions
 import java.util.UUID
-import java.io.ByteArrayOutputStream
-import java.util.Locale
-
-private enum class DemoTab { Map, Settings }
-private enum class DrawMode { Browse, Annotation, Polyline, Polygon, Circle }
-private enum class PlacementTrigger { Tap, LongPress }
-private enum class AnnotationVisualStyle { Default, CustomImage }
-private enum class MarkerGlyphMode { GlyphText, GlyphImage }
-private enum class ZoomRangePreset {
-    none,
-    city,
-    district
-}
-private enum class PoiFilterPreset {
-    all,
-    none,
-    includeCafePark,
-    excludeCafePark
-}
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        if (!MKMapKit.isInitialized()) {
-            MKMapKit.init(BuildConfig.MAPKIT_JS_TOKEN)
-        }
-
-        setContent {
-            DemoScreen()
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DemoScreen() {
+internal fun DemoScreen() {
     var region by remember {
         mutableStateOf(
             MKCoordinateRegion.fromCenter(
@@ -124,11 +79,14 @@ private fun DemoScreen() {
             )
         )
     }
-    var committedOverlays by remember {
-        mutableStateOf<List<MKOverlay>>(emptyList())
-    }
+    var committedOverlays by remember { mutableStateOf<List<MKOverlay>>(emptyList()) }
     var options by remember {
-        mutableStateOf(MKMapOptions(userLocation = MKUserLocationOptions(isEnabled = false)))
+        mutableStateOf(
+            MKMapOptions(
+                userLocation = MKUserLocationOptions(isEnabled = false),
+                showsZoomControl = true
+            )
+        )
     }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -136,6 +94,7 @@ private fun DemoScreen() {
     var modeExpanded by remember { mutableStateOf(false) }
     var draftPoints by remember { mutableStateOf<List<MKCoordinate>>(emptyList()) }
     var lastEventText by remember { mutableStateOf("No events yet") }
+
     var placementTrigger by remember { mutableStateOf(PlacementTrigger.LongPress) }
     var annotationVisualStyle by remember { mutableStateOf(AnnotationVisualStyle.Default) }
     var annotationTitle by remember { mutableStateOf("Pinned") }
@@ -144,15 +103,19 @@ private fun DemoScreen() {
     var annotationGlyph by remember { mutableStateOf("A") }
     var markerGlyphMode by remember { mutableStateOf(MarkerGlyphMode.GlyphText) }
     var customImageColorHex by remember { mutableStateOf("#f97316") }
-    var baseConfigExpanded by remember { mutableStateOf(true) }
-    var annotationConfigExpanded by remember { mutableStateOf(true) }
-    var polylineConfigExpanded by remember { mutableStateOf(true) }
+
+    var baseConfigExpanded by remember { mutableStateOf(false) }
+    var annotationConfigExpanded by remember { mutableStateOf(false) }
+    var polylineConfigExpanded by remember { mutableStateOf(false) }
+    var polygonConfigExpanded by remember { mutableStateOf(false) }
+    var circleConfigExpanded by remember { mutableStateOf(false) }
+
     var polylineColorHex by remember { mutableStateOf("#0ea5e9") }
     var polylineWidthText by remember { mutableStateOf("4.0") }
     var polylineDashed by remember { mutableStateOf(false) }
     var polylineDashLengthText by remember { mutableStateOf("10") }
     var polylineGapLengthText by remember { mutableStateOf("6") }
-    var polygonConfigExpanded by remember { mutableStateOf(true) }
+
     var polygonStrokeColorHex by remember { mutableStateOf("#22c55e") }
     var polygonFillColorHex by remember { mutableStateOf("#22c55e") }
     var polygonFillAlphaText by remember { mutableStateOf("0.20") }
@@ -160,7 +123,7 @@ private fun DemoScreen() {
     var polygonDashed by remember { mutableStateOf(false) }
     var polygonDashLengthText by remember { mutableStateOf("10") }
     var polygonGapLengthText by remember { mutableStateOf("6") }
-    var circleConfigExpanded by remember { mutableStateOf(true) }
+
     var circleStrokeColorHex by remember { mutableStateOf("#2563eb") }
     var circleFillColorHex by remember { mutableStateOf("#2563eb") }
     var circleFillAlphaText by remember { mutableStateOf("0.20") }
@@ -440,11 +403,13 @@ private fun DemoScreen() {
                                 DrawMode.Polygon -> {
                                     draftPoints = draftPoints + coordinate
                                 }
+
                                 DrawMode.Circle -> {
                                     draftPoints = listOf(coordinate)
                                 }
                             }
                         }
+
                         Log.d("MainActivity", "$event")
                         when (event) {
                             is MKMapEvent.RegionDidChange -> {
@@ -458,6 +423,7 @@ private fun DemoScreen() {
                                     addGeometryPoint(event.coordinate)
                                 }
                             }
+
                             is MKMapEvent.MapTapped -> {
                                 if (placementTrigger == PlacementTrigger.Tap) {
                                     addGeometryPoint(event.coordinate)
@@ -478,6 +444,7 @@ private fun DemoScreen() {
                         val s = f.categories.map { it.lowercase() }.toSet()
                         if (s == setOf("cafe", "park")) PoiFilterPreset.includeCafePark else PoiFilterPreset.all
                     }
+
                     is MKPoiFilter.Exclude -> {
                         val s = f.categories.map { it.lowercase() }.toSet()
                         if (s == setOf("cafe", "park")) PoiFilterPreset.excludeCafePark else PoiFilterPreset.all
@@ -487,8 +454,10 @@ private fun DemoScreen() {
                     null -> ZoomRangePreset.none
                     MKCameraZoomRange(minDistanceMeter = 150.0, maxDistanceMeter = 20_000.0) ->
                         ZoomRangePreset.city
+
                     MKCameraZoomRange(minDistanceMeter = 50.0, maxDistanceMeter = 3_000.0) ->
                         ZoomRangePreset.district
+
                     else -> ZoomRangePreset.none
                 }
 
@@ -499,7 +468,150 @@ private fun DemoScreen() {
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    ConfigSectionHeader(
+                    ExpandableSectionHeader(
+                        title = "Base Config",
+                        expanded = baseConfigExpanded,
+                        onExpandedChange = { baseConfigExpanded = it }
+                    )
+                    if (baseConfigExpanded) {
+                        EnumSelector(
+                            label = "Map Style",
+                            value = options.mapStyle,
+                            values = MKMapStyle.entries,
+                            onSelected = { options = options.copy(mapStyle = it) }
+                        )
+                        EnumSelector(
+                            label = "Language",
+                            value = options.language,
+                            values = MKMapLanguage.entries,
+                            onSelected = { options = options.copy(language = it) }
+                        )
+                        EnumSelector(
+                            label = "Appearance",
+                            value = options.appearance,
+                            values = MKAppearanceOption.entries,
+                            onSelected = { options = options.copy(appearance = it) }
+                        )
+                        EnumSelector(
+                            label = "POI Filter",
+                            value = poiFilterPreset,
+                            values = PoiFilterPreset.entries,
+                            onSelected = { preset ->
+                                val filter = when (preset) {
+                                    PoiFilterPreset.all -> MKPoiFilter.All
+                                    PoiFilterPreset.none -> MKPoiFilter.None
+                                    PoiFilterPreset.includeCafePark -> MKPoiFilter.Include(listOf("cafe", "park"))
+                                    PoiFilterPreset.excludeCafePark -> MKPoiFilter.Exclude(listOf("cafe", "park"))
+                                }
+                                options = options.copy(poiFilter = filter)
+                            }
+                        )
+                        EnumSelector(
+                            label = "Zoom Range",
+                            value = zoomRangePreset,
+                            values = ZoomRangePreset.entries,
+                            onSelected = { preset ->
+                                options = options.copy(
+                                    cameraZoomRange = when (preset) {
+                                        ZoomRangePreset.none -> null
+                                        ZoomRangePreset.city -> MKCameraZoomRange(
+                                            minDistanceMeter = 150.0,
+                                            maxDistanceMeter = 20_000.0
+                                        )
+
+                                        ZoomRangePreset.district -> MKCameraZoomRange(
+                                            minDistanceMeter = 50.0,
+                                            maxDistanceMeter = 3_000.0
+                                        )
+                                    }
+                                )
+                            }
+                        )
+
+                        ToggleRow(
+                            label = "User Location",
+                            checked = options.userLocation.isEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                } else {
+                                    options = options.copy(
+                                        userLocation = options.userLocation.copy(isEnabled = false)
+                                    )
+                                }
+                            }
+                        )
+                        ToggleRow(
+                            label = "User Location Follows Heading",
+                            checked = options.userLocation.followsHeading,
+                            onCheckedChange = {
+                                options = options.copy(
+                                    userLocation = options.userLocation.copy(followsHeading = it)
+                                )
+                            }
+                        )
+                        ToggleRow(
+                            label = "User Location Accuracy Ring",
+                            checked = options.userLocation.showsAccuracyRing,
+                            onCheckedChange = {
+                                options = options.copy(
+                                    userLocation = options.userLocation.copy(showsAccuracyRing = it)
+                                )
+                            }
+                        )
+                        ToggleRow(
+                            label = "Compass",
+                            checked = options.showsCompass,
+                            onCheckedChange = { options = options.copy(showsCompass = it) }
+                        )
+                        ToggleRow(
+                            label = "Scale",
+                            checked = options.showsScale,
+                            onCheckedChange = { options = options.copy(showsScale = it) }
+                        )
+                        ToggleRow(
+                            label = "Points Of Interest",
+                            checked = options.showsPointsOfInterest,
+                            onCheckedChange = { options = options.copy(showsPointsOfInterest = it) }
+                        )
+                        ToggleRow(
+                            label = "Zoom Control",
+                            checked = options.showsZoomControl,
+                            onCheckedChange = { options = options.copy(showsZoomControl = it) }
+                        )
+                        ToggleRow(
+                            label = "Map Type Control",
+                            checked = options.showsMapTypeControl,
+                            onCheckedChange = { options = options.copy(showsMapTypeControl = it) }
+                        )
+                        ToggleRow(
+                            label = "Rotate Enabled",
+                            checked = options.isRotateEnabled,
+                            onCheckedChange = { options = options.copy(isRotateEnabled = it) }
+                        )
+                        ToggleRow(
+                            label = "Scroll Enabled",
+                            checked = options.isScrollEnabled,
+                            onCheckedChange = { options = options.copy(isScrollEnabled = it) }
+                        )
+                        ToggleRow(
+                            label = "Zoom Enabled",
+                            checked = options.isZoomEnabled,
+                            onCheckedChange = { options = options.copy(isZoomEnabled = it) }
+                        )
+                        ToggleRow(
+                            label = "Pitch Enabled",
+                            checked = options.isPitchEnabled,
+                            onCheckedChange = { options = options.copy(isPitchEnabled = it) }
+                        )
+                    }
+
+                    ExpandableSectionHeader(
                         title = "Annotation Config",
                         expanded = annotationConfigExpanded,
                         onExpandedChange = { annotationConfigExpanded = it }
@@ -529,6 +641,7 @@ private fun DemoScreen() {
                             label = { Text("Annotation Subtitle") },
                             modifier = Modifier.fillMaxWidth()
                         )
+
                         if (annotationVisualStyle == AnnotationVisualStyle.Default) {
                             EnumSelector(
                                 label = "Marker Glyph Mode",
@@ -569,7 +682,7 @@ private fun DemoScreen() {
                         }
                     }
 
-                    ConfigSectionHeader(
+                    ExpandableSectionHeader(
                         title = "Polyline Config",
                         expanded = polylineConfigExpanded,
                         onExpandedChange = { polylineConfigExpanded = it }
@@ -608,7 +721,7 @@ private fun DemoScreen() {
                         }
                     }
 
-                    ConfigSectionHeader(
+                    ExpandableSectionHeader(
                         title = "Polygon Config",
                         expanded = polygonConfigExpanded,
                         onExpandedChange = { polygonConfigExpanded = it }
@@ -659,7 +772,7 @@ private fun DemoScreen() {
                         }
                     }
 
-                    ConfigSectionHeader(
+                    ExpandableSectionHeader(
                         title = "Circle Config",
                         expanded = circleConfigExpanded,
                         onExpandedChange = { circleConfigExpanded = it }
@@ -696,201 +809,7 @@ private fun DemoScreen() {
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-
-                    ConfigSectionHeader(
-                        title = "Base Config",
-                        expanded = baseConfigExpanded,
-                        onExpandedChange = { baseConfigExpanded = it }
-                    )
-                    if (baseConfigExpanded) {
-                        EnumSelector(
-                            label = "Map Style",
-                            value = options.mapStyle,
-                            values = MKMapStyle.entries,
-                            onSelected = { options = options.copy(mapStyle = it) }
-                        )
-                        EnumSelector(
-                            label = "Language",
-                            value = options.language,
-                            values = MKMapLanguage.entries,
-                            onSelected = { options = options.copy(language = it) }
-                        )
-                        EnumSelector(
-                            label = "Appearance",
-                            value = options.appearance,
-                            values = MKAppearanceOption.entries,
-                            onSelected = { options = options.copy(appearance = it) }
-                        )
-                        EnumSelector(
-                            label = "POI Filter",
-                            value = poiFilterPreset,
-                            values = PoiFilterPreset.entries,
-                            onSelected = { preset ->
-                                val filter = when (preset) {
-                                    PoiFilterPreset.all -> MKPoiFilter.All
-                                    PoiFilterPreset.none -> MKPoiFilter.None
-                                    PoiFilterPreset.includeCafePark -> {
-                                        MKPoiFilter.Include(listOf("cafe", "park"))
-                                    }
-                                    PoiFilterPreset.excludeCafePark -> {
-                                        MKPoiFilter.Exclude(listOf("cafe", "park"))
-                                    }
-                                }
-                                options = options.copy(poiFilter = filter)
-                            }
-                        )
-                        EnumSelector(
-                            label = "Zoom Range",
-                            value = zoomRangePreset,
-                            values = ZoomRangePreset.entries,
-                            onSelected = { preset ->
-                                options = options.copy(
-                                    cameraZoomRange = when (preset) {
-                                        ZoomRangePreset.none -> null
-                                        ZoomRangePreset.city -> MKCameraZoomRange(
-                                            minDistanceMeter = 150.0,
-                                            maxDistanceMeter = 20_000.0
-                                        )
-                                        ZoomRangePreset.district -> MKCameraZoomRange(
-                                            minDistanceMeter = 50.0,
-                                            maxDistanceMeter = 3_000.0
-                                        )
-                                    }
-                                )
-                            }
-                        )
-
-                        ToggleRow(
-                            label = "User Location",
-                            checked = options.userLocation.isEnabled,
-                            onCheckedChange = { enabled ->
-                                if (enabled) {
-                                    permissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
-                                    )
-                                } else {
-                                    options = options.copy(
-                                        userLocation = options.userLocation.copy(isEnabled = false)
-                                    )
-                                }
-                            }
-                        )
-                        ToggleRow(
-                            label = "Compass",
-                            checked = options.showsCompass,
-                            onCheckedChange = { options = options.copy(showsCompass = it) }
-                        )
-                        ToggleRow(
-                            label = "Points Of Interest",
-                            checked = options.showsPointsOfInterest,
-                            onCheckedChange = { options = options.copy(showsPointsOfInterest = it) }
-                        )
-                        ToggleRow(
-                            label = "Zoom Control",
-                            checked = options.showsZoomControl,
-                            onCheckedChange = { options = options.copy(showsZoomControl = it) }
-                        )
-                        ToggleRow(
-                            label = "Map Type Control",
-                            checked = options.showsMapTypeControl,
-                            onCheckedChange = { options = options.copy(showsMapTypeControl = it) }
-                        )
-                        ToggleRow(
-                            label = "Rotate Enabled",
-                            checked = options.isRotateEnabled,
-                            onCheckedChange = { options = options.copy(isRotateEnabled = it) }
-                        )
-                        ToggleRow(
-                            label = "Scroll Enabled",
-                            checked = options.isScrollEnabled,
-                            onCheckedChange = { options = options.copy(isScrollEnabled = it) }
-                        )
-                        ToggleRow(
-                            label = "Zoom Enabled",
-                            checked = options.isZoomEnabled,
-                            onCheckedChange = { options = options.copy(isZoomEnabled = it) }
-                        )
-                        ToggleRow(
-                            label = "Pitch Enabled",
-                            checked = options.isPitchEnabled,
-                            onCheckedChange = { options = options.copy(isPitchEnabled = it) }
-                        )
-                    }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConfigSectionHeader(
-    title: String,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        Switch(checked = expanded, onCheckedChange = onExpandedChange)
-    }
-}
-
-@Composable
-private fun ToggleRow(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun <T : Enum<T>> EnumSelector(
-    label: String,
-    value: T,
-    values: List<T>,
-    onSelected: (T) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = value.name,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth()
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            values.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.name) },
-                    onClick = {
-                        onSelected(option)
-                        expanded = false
-                    }
-                )
             }
         }
     }
@@ -913,126 +832,4 @@ private fun MKMapEvent.toDisplayText(): String {
             "UserLocationUpdated(${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
         }
     }
-}
-
-private fun Double.format6(): String = String.format("%.6f", this)
-
-private fun renderFilledCircleBase64Png(fillColorHex: String, sizePx: Int): String {
-    val safeSize = sizePx.coerceAtLeast(16)
-    val bmp = Bitmap.createBitmap(safeSize, safeSize, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bmp)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = parseHexColor(fillColorHex, Color.parseColor("#F97316"))
-    }
-    val cx = safeSize / 2f
-    val cy = safeSize / 2f
-    val radius = safeSize * 0.42f
-    canvas.drawCircle(cx, cy, radius, paint)
-
-    val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = (safeSize * 0.06f).coerceAtLeast(1f)
-        color = Color.WHITE
-    }
-    canvas.drawCircle(cx, cy, radius, stroke)
-
-    val out = ByteArrayOutputStream()
-    bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-    val bytes = out.toByteArray()
-    return Base64.encodeToString(bytes, Base64.NO_WRAP)
-}
-
-private fun parseHexColor(hex: String, fallback: Int): Int {
-    return try {
-        Color.parseColor(hex.trim())
-    } catch (_: Throwable) {
-        fallback
-    }
-}
-
-private fun buildPolylineOverlayStyle(
-    colorHex: String,
-    widthText: String,
-    dashed: Boolean,
-    dashLengthText: String,
-    gapLengthText: String
-): MKOverlayStyle {
-    val width = parsePositiveDouble(widthText, fallback = 4.0)
-    val dashPattern = if (dashed) {
-        listOf(
-            parsePositiveDouble(dashLengthText, fallback = 10.0),
-            parsePositiveDouble(gapLengthText, fallback = 6.0)
-        )
-    } else {
-        null
-    }
-    return MKOverlayStyle(
-        strokeColorHex = colorHex.ifBlank { "#0ea5e9" },
-        strokeWidth = width,
-        lineDashPattern = dashPattern
-    )
-}
-
-private fun buildPolygonOverlayStyle(
-    strokeColorHex: String,
-    fillColorHex: String,
-    fillAlphaText: String,
-    widthText: String,
-    dashed: Boolean,
-    dashLengthText: String,
-    gapLengthText: String
-): MKOverlayStyle {
-    val width = parsePositiveDouble(widthText, fallback = 3.0)
-    val dashPattern = if (dashed) {
-        listOf(
-            parsePositiveDouble(dashLengthText, fallback = 10.0),
-            parsePositiveDouble(gapLengthText, fallback = 6.0)
-        )
-    } else {
-        null
-    }
-    return MKOverlayStyle(
-        strokeColorHex = strokeColorHex.ifBlank { "#22c55e" },
-        strokeWidth = width,
-        fillColorHex = buildRgbaColor(
-            colorHex = fillColorHex.ifBlank { "#22c55e" },
-            alphaText = fillAlphaText
-        ),
-        lineDashPattern = dashPattern
-    )
-}
-
-private fun buildCircleOverlayStyle(
-    strokeColorHex: String,
-    fillColorHex: String,
-    fillAlphaText: String,
-    widthText: String
-): MKOverlayStyle {
-    return MKOverlayStyle(
-        strokeColorHex = strokeColorHex.ifBlank { "#2563eb" },
-        strokeWidth = parsePositiveDouble(widthText, fallback = 3.0),
-        fillColorHex = buildRgbaColor(
-            colorHex = fillColorHex.ifBlank { "#2563eb" },
-            alphaText = fillAlphaText
-        )
-    )
-}
-
-private fun parsePositiveDouble(text: String, fallback: Double): Double {
-    val parsed = text.toDoubleOrNull() ?: return fallback
-    return if (parsed > 0.0) parsed else fallback
-}
-
-private fun buildRgbaColor(colorHex: String, alphaText: String): String {
-    val rgb = try {
-        Color.parseColor(colorHex.trim())
-    } catch (_: Throwable) {
-        Color.parseColor("#22c55e")
-    }
-    val r = Color.red(rgb)
-    val g = Color.green(rgb)
-    val b = Color.blue(rgb)
-    val a = (alphaText.toDoubleOrNull() ?: 0.2).coerceIn(0.0, 1.0)
-    return "rgba($r, $g, $b, ${String.format(Locale.US, "%.3f", a)})"
 }

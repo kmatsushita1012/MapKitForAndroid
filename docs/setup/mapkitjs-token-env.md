@@ -5,7 +5,7 @@
 ## 1. 前提
 
 - 本プロジェクトの `example` は `BuildConfig.MAPKIT_JS_TOKEN` を使って `MKMapKit.init(token)` へ渡します。
-- トークンは `example/demo-app/build.gradle.kts` で次の優先順に解決されます。
+- トークンは `example/example-app/build.gradle.kts` で次の優先順に解決されます。
 1. `local.properties` の `MAPKIT_JS_TOKEN`
 2. OS 環境変数 `MAPKIT_JS_TOKEN`
 3. 未設定時は `"DUMMY_TOKEN_FOR_DEMO"`
@@ -50,7 +50,7 @@ export MAPKIT_JS_TOKEN="YOUR_APPLE_MAPKIT_JS_TOKEN"
 
 ## 4. BuildConfig への注入箇所
 
-`example/demo-app/build.gradle.kts` で `BuildConfig.MAPKIT_JS_TOKEN` を生成しています。
+`example/example-app/build.gradle.kts` で `BuildConfig.MAPKIT_JS_TOKEN` を生成しています。
 
 ```kotlin
 val mapToken = localProps.getProperty("MAPKIT_JS_TOKEN")
