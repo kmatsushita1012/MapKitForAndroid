@@ -1,6 +1,6 @@
 # MapKit for Android
 
-[English](/Users/matsushitakazuya/private/MapKitForAndroid/README.md) | 日本語
+[English](README.md) | 日本語
 
 MapKit JS を Android `WebView` で扱うための Kotlin ライブラリです。  
 Compose から `MKMapView` を使って地図を表示し、Annotation / Overlay / Region / Option を Kotlin モデルで制御できます。
@@ -86,7 +86,7 @@ android {
 }
 ```
 
-トークン設定の詳細は [docs/setup/mapkitjs-token-env.md](/Users/matsushitakazuya/private/MapKitForAndroid/docs/setup/mapkitjs-token-env.md) を参照してください。
+トークン設定の詳細は [docs/setup/mapkitjs-token-env.md](docs/setup/mapkitjs-token-env.md) を参照してください。
 
 ### 2. Android permission / manifest
 
