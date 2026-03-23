@@ -202,7 +202,6 @@ class MKBridgeWebView @JvmOverloads constructor(
                         .put("title", annotation.title)
                         .put("subtitle", annotation.subtitle)
                         .put("isVisible", annotation.isVisible)
-                        .put("isSelected", annotation.isSelected)
                         .put("style", serializeAnnotationStyle(annotation.renderingStyle()))
                 )
             }

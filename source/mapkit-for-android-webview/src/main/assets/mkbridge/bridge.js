@@ -472,9 +472,6 @@
     }
     if (!annotation) return null;
     annotation.data = { id: item.id };
-    if (item.isSelected && typeof annotation.selected !== "undefined") {
-      annotation.selected = true;
-    }
     if (typeof annotation.addEventListener === "function") {
       annotation.addEventListener("select", function () {
         debugLog("emit annotationTapped(annotation.select) id=" + item.id);
