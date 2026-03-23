@@ -66,6 +66,7 @@ private enum class DemoTab { Map, Settings }
 private enum class DrawMode { Browse, Annotation, Polyline, Polygon }
 private enum class PlacementTrigger { Tap, LongPress }
 private enum class AnnotationVisualStyle { Default, CustomImage }
+private enum class MarkerGlyphMode { GlyphText, GlyphImage }
 private enum class ZoomRangePreset {
     none,
     city,
@@ -133,6 +134,7 @@ private fun DemoScreen() {
     var annotationSubtitle by remember { mutableStateOf("") }
     var annotationTintHex by remember { mutableStateOf("#0ea5e9") }
     var annotationGlyph by remember { mutableStateOf("A") }
+    var markerGlyphMode by remember { mutableStateOf(MarkerGlyphMode.GlyphText) }
     var baseConfigExpanded by remember { mutableStateOf(true) }
     var annotationConfigExpanded by remember { mutableStateOf(true) }
 
@@ -320,12 +322,21 @@ private fun DemoScreen() {
                                 DrawMode.Browse -> Unit
                                 DrawMode.Annotation -> {
                                     val annotationStyle = when (annotationVisualStyle) {
-                                        AnnotationVisualStyle.Default -> MKAnnotationStyle.DefaultMarker(
+                                        AnnotationVisualStyle.Default -> MKAnnotationStyle.Default(
                                             tintHex = annotationTintHex.ifBlank { null },
-                                            glyphText = annotationGlyph.ifBlank { null }
+                                            glyphText = if (markerGlyphMode == MarkerGlyphMode.GlyphText) {
+                                                annotationGlyph.ifBlank { null }
+                                            } else {
+                                                null
+                                            },
+                                            glyphImageSource = if (markerGlyphMode == MarkerGlyphMode.GlyphImage) {
+                                                MKImageSource.Url("file:///android_asset/demo/custom-glyph.svg")
+                                            } else {
+                                                null
+                                            }
                                         )
 
-                                        AnnotationVisualStyle.CustomImage -> MKAnnotationStyle.Image(
+                                        AnnotationVisualStyle.CustomImage -> MKAnnotationStyle.CustomImage(
                                             source = MKImageSource.Url("file:///android_asset/demo/custom-annotation.svg"),
                                             widthDp = 40,
                                             heightDp = 40
@@ -431,18 +442,31 @@ private fun DemoScreen() {
                             modifier = Modifier.fillMaxWidth()
                         )
                         if (annotationVisualStyle == AnnotationVisualStyle.Default) {
+                            EnumSelector(
+                                label = "Marker Glyph Mode",
+                                value = markerGlyphMode,
+                                values = MarkerGlyphMode.entries,
+                                onSelected = { markerGlyphMode = it }
+                            )
                             OutlinedTextField(
                                 value = annotationTintHex,
                                 onValueChange = { annotationTintHex = it },
                                 label = { Text("Marker Tint (hex)") },
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            OutlinedTextField(
-                                value = annotationGlyph,
-                                onValueChange = { annotationGlyph = it.take(2) },
-                                label = { Text("Marker Glyph") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            if (markerGlyphMode == MarkerGlyphMode.GlyphText) {
+                                OutlinedTextField(
+                                    value = annotationGlyph,
+                                    onValueChange = { annotationGlyph = it.take(2) },
+                                    label = { Text("Marker Glyph") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    text = "Marker glyph image: file:///android_asset/demo/custom-glyph.svg",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         } else {
                             Text(
                                 text = "Custom image: file:///android_asset/demo/custom-annotation.svg",

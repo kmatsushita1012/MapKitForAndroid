@@ -313,17 +313,17 @@ class MKBridgeWebView @JvmOverloads constructor(
 
     private fun serializeAnnotationStyle(style: MKAnnotationStyle): JSONObject {
         return when (style) {
-            is MKAnnotationStyle.DefaultPin -> JSONObject()
-                .put("kind", "defaultPin")
-                .put("tintHex", style.tintHex)
-
-            is MKAnnotationStyle.DefaultMarker -> JSONObject()
-                .put("kind", "defaultMarker")
+            is MKAnnotationStyle.Default -> JSONObject()
+                .put("kind", "default")
                 .put("tintHex", style.tintHex)
                 .put("glyphText", style.glyphText)
+                .put(
+                    "glyphImageSource",
+                    style.glyphImageSource?.let { serializeImageSource(it) }
+                )
 
-            is MKAnnotationStyle.Image -> JSONObject()
-                .put("kind", "image")
+            is MKAnnotationStyle.CustomImage -> JSONObject()
+                .put("kind", "customImage")
                 .put("source", serializeImageSource(style.source))
                 .put("widthDp", style.widthDp)
                 .put("heightDp", style.heightDp)

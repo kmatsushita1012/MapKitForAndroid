@@ -62,12 +62,12 @@ sealed interface MKImageSource {
 }
 
 sealed interface MKAnnotationStyle {
-    data class DefaultPin(val tintHex: String? = null) : MKAnnotationStyle
-    data class DefaultMarker(
+    data class Default(
         val tintHex: String? = null,
-        val glyphText: String? = null
+        val glyphText: String? = null,
+        val glyphImageSource: MKImageSource? = null
     ) : MKAnnotationStyle
-    data class Image(
+    data class CustomImage(
         val source: MKImageSource,
         val widthDp: Int,
         val heightDp: Int,
@@ -83,7 +83,7 @@ data class MKAnnotation(
     val subtitle: String? = null,
     val isVisible: Boolean = true,
     val isSelected: Boolean = false,
-    val style: MKAnnotationStyle = MKAnnotationStyle.DefaultMarker()
+    val style: MKAnnotationStyle = MKAnnotationStyle.Default()
 )
 
 data class MKOverlayStyle(

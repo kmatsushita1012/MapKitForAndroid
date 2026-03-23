@@ -437,16 +437,10 @@
 
   function buildAnnotation(item) {
     const coord = new window.mapkit.Coordinate(item.lat, item.lng);
-    const style = item.style || { kind: "defaultMarker" };
+    const style = item.style || { kind: "default" };
     let annotation = null;
     try {
-      if (style.kind === "defaultPin") {
-        annotation = new window.mapkit.Annotation(coord, {
-          title: item.title || item.id,
-          subtitle: item.subtitle || undefined,
-          color: style.tintHex || undefined,
-        });
-      } else if (style.kind === "image" && window.mapkit.Annotation) {
+      if (style.kind === "customImage" && window.mapkit.Annotation) {
         const imageUrl = resolveImageSource(style.source);
         const img = document.createElement("img");
         img.src = imageUrl || "";
@@ -461,12 +455,23 @@
           element: img,
         });
       } else {
-        annotation = new window.mapkit.MarkerAnnotation(coord, {
+        const options = {
           title: item.title || item.id,
           subtitle: item.subtitle || undefined,
           color: style.tintHex || undefined,
           glyphText: style.glyphText || undefined,
-        });
+        };
+        const glyphImageUrl = resolveImageSource(style.glyphImageSource);
+        if (glyphImageUrl) {
+          try {
+            const glyphImage = document.createElement("img");
+            glyphImage.src = glyphImageUrl;
+            glyphImage.style.width = "18px";
+            glyphImage.style.height = "18px";
+            options.glyphImage = glyphImage;
+          } catch (_) {}
+        }
+        annotation = new window.mapkit.MarkerAnnotation(coord, options);
       }
     } catch (_) {
       annotation = new window.mapkit.MarkerAnnotation(coord, {
