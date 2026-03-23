@@ -226,17 +226,18 @@
 - UI 表示系(compass/scale/zoom/mapTypeControl)は map control 設定へ変換
 - `poiFilter` は `pointOfInterestFilter` に変換
 - `cameraZoomRange` は `map.cameraZoomRange` に変換
-- `userLocation` は `showsUserLocation` と bridge 側ユーザー位置注釈に変換
+- `userLocation` は `showsUserLocation` と WebView geolocation 許可フローに変換
 
 #### 5.2.2 適用順序
 - 初期化直後に `MapOptions` 一括適用。
 - 以後は変更差分のみ適用し、再初期化しない。
 
 #### 5.2.3 モジュール構成
+- `source:mapkit-android` (利用者向け集約 artifact)
 - `source:mapkit-android-core` (公開 API)
 - `source:mapkit-android-webview` (Bridge/Engine)
 - `source:mapkit-android-compose` (Compose ラッパ)
-- `example:example-app` (利用例)
+- `example:app` (利用例)
 
 #### 5.2.4 公開設定
 - `maven-publish` + `signing` を前提。

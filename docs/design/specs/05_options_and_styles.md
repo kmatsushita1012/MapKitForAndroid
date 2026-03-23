@@ -130,11 +130,12 @@ data class PublishCoordinates(
 
 data class ModuleLayout(
     val sourceModules: List<String> = listOf(
+        "mapkit-android",
         "mapkit-android-core",
         "mapkit-android-webview",
         "mapkit-android-compose"
     ),
-    val exampleModules: List<String> = listOf("example-app")
+    val exampleModules: List<String> = listOf("app")
 )
 ```
 

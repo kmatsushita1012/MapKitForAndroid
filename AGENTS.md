@@ -6,7 +6,8 @@
 - `source/mapkit-android-core`: 公開モデルと初期化API
 - `source/mapkit-android-webview`: WebView + MapKit JS ブリッジ
 - `source/mapkit-android-compose`: Compose向け `MKMapView`
-- `example/example-app`: 動作確認用アプリ
+- `source/mapkit-android`: 利用者向け集約モジュール
+- `example/app`: 動作確認用アプリ
 - `docs/design`: 正式仕様
 - `feature_request`: 実装前の要求仕様メモ
 
@@ -22,7 +23,7 @@
 - 将来再導入する場合は `feature_request` で再定義してから検討する。
 
 ## 4. 実装時の必須チェック
-- 変更後は最低でも `./gradlew :example:example-app:assembleDebug` を実行。
+- 変更後は最低でも `./gradlew :example:app:assembleDebug` を実行。
 - 反映不具合の切り分け時は JS 側の debug log を優先確認。
 - map canvas が 0 height で初期化されないよう注意する。
 

@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,14 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -58,7 +51,7 @@ import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DemoScreen() {
+internal fun AppScreen() {
     var region by remember {
         mutableStateOf(
             MKCoordinateRegion.fromCenter(
@@ -130,7 +123,7 @@ internal fun DemoScreen() {
     var circleStrokeWidthText by remember { mutableStateOf("3.0") }
     var circleRadiusText by remember { mutableStateOf("120") }
 
-    val selectedTab = if (selectedTabIndex == 0) DemoTab.Map else DemoTab.Settings
+    val selectedTab = if (selectedTabIndex == 0) AppTab.Map else AppTab.Settings
 
     val draftOverlay = when (drawMode) {
         DrawMode.Polyline -> if (draftPoints.size >= 2) {
@@ -216,19 +209,19 @@ internal fun DemoScreen() {
     ) {
         TabRow(selectedTabIndex = selectedTabIndex) {
             Tab(
-                selected = selectedTab == DemoTab.Map,
+                selected = selectedTab == AppTab.Map,
                 onClick = { selectedTabIndex = 0 },
                 text = { Text("Map") }
             )
             Tab(
-                selected = selectedTab == DemoTab.Settings,
+                selected = selectedTab == AppTab.Settings,
                 onClick = { selectedTabIndex = 1 },
                 text = { Text("Settings") }
             )
         }
 
         when (selectedTab) {
-            DemoTab.Map -> {
+            AppTab.Map -> {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -243,112 +236,73 @@ internal fun DemoScreen() {
                             .fillMaxWidth()
                             .height(44.dp)
                     )
-                    ExposedDropdownMenuBox(
+                    DrawModeSelector(
+                        drawMode = drawMode,
                         expanded = modeExpanded,
-                        onExpandedChange = { modeExpanded = !modeExpanded },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = drawMode.name,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Mode") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modeExpanded) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                        )
-                        DropdownMenu(
-                            expanded = modeExpanded,
-                            onDismissRequest = { modeExpanded = false }
-                        ) {
-                            DrawMode.entries.forEach { mode ->
-                                DropdownMenuItem(
-                                    text = { Text(mode.name) },
-                                    onClick = {
-                                        drawMode = mode
-                                        draftPoints = emptyList()
-                                        modeExpanded = false
-                                    }
-                                )
-                            }
+                        onExpandedChange = { modeExpanded = it },
+                        onModeSelected = { mode ->
+                            drawMode = mode
+                            draftPoints = emptyList()
+                            modeExpanded = false
                         }
-                    }
+                    )
 
                     if (drawMode == DrawMode.Polyline || drawMode == DrawMode.Polygon || drawMode == DrawMode.Circle) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (draftPoints.isNotEmpty()) {
-                                        draftPoints = draftPoints.dropLast(1)
-                                    }
+                        DraftGeometryActionRow(
+                            drawMode = drawMode,
+                            draftPointCount = draftPoints.size,
+                            onUndo = {
+                                if (draftPoints.isNotEmpty()) {
+                                    draftPoints = draftPoints.dropLast(1)
                                 }
-                            ) {
-                                Text("Undo")
-                            }
-                            OutlinedButton(onClick = { draftPoints = emptyList() }) {
-                                Text("Clear")
-                            }
-                            Button(
-                                enabled = (drawMode == DrawMode.Polyline && draftPoints.size >= 2) ||
-                                    (drawMode == DrawMode.Polygon && draftPoints.size >= 3) ||
-                                    (drawMode == DrawMode.Circle && draftPoints.isNotEmpty()),
-                                onClick = {
-                                    val id = UUID.randomUUID().toString()
-                                    committedOverlays = committedOverlays + when (drawMode) {
-                                        DrawMode.Polyline -> MKPolylineOverlay(
-                                            id = id,
-                                            points = draftPoints,
-                                            style = buildPolylineOverlayStyle(
-                                                colorHex = polylineColorHex,
-                                                widthText = polylineWidthText,
-                                                dashed = polylineDashed,
-                                                dashLengthText = polylineDashLengthText,
-                                                gapLengthText = polylineGapLengthText
-                                            )
+                            },
+                            onClear = { draftPoints = emptyList() },
+                            onConfirm = {
+                                val id = UUID.randomUUID().toString()
+                                committedOverlays = committedOverlays + when (drawMode) {
+                                    DrawMode.Polyline -> MKPolylineOverlay(
+                                        id = id,
+                                        points = draftPoints,
+                                        style = buildPolylineOverlayStyle(
+                                            colorHex = polylineColorHex,
+                                            widthText = polylineWidthText,
+                                            dashed = polylineDashed,
+                                            dashLengthText = polylineDashLengthText,
+                                            gapLengthText = polylineGapLengthText
                                         )
+                                    )
 
-                                        DrawMode.Polygon -> MKPolygonOverlay(
-                                            id = id,
-                                            points = draftPoints,
-                                            style = buildPolygonOverlayStyle(
-                                                strokeColorHex = polygonStrokeColorHex,
-                                                fillColorHex = polygonFillColorHex,
-                                                fillAlphaText = polygonFillAlphaText,
-                                                widthText = polygonStrokeWidthText,
-                                                dashed = polygonDashed,
-                                                dashLengthText = polygonDashLengthText,
-                                                gapLengthText = polygonGapLengthText
-                                            )
+                                    DrawMode.Polygon -> MKPolygonOverlay(
+                                        id = id,
+                                        points = draftPoints,
+                                        style = buildPolygonOverlayStyle(
+                                            strokeColorHex = polygonStrokeColorHex,
+                                            fillColorHex = polygonFillColorHex,
+                                            fillAlphaText = polygonFillAlphaText,
+                                            widthText = polygonStrokeWidthText,
+                                            dashed = polygonDashed,
+                                            dashLengthText = polygonDashLengthText,
+                                            gapLengthText = polygonGapLengthText
                                         )
+                                    )
 
-                                        DrawMode.Circle -> MKCircleOverlay(
-                                            id = id,
-                                            center = draftPoints.last(),
-                                            radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
-                                            style = buildCircleOverlayStyle(
-                                                strokeColorHex = circleStrokeColorHex,
-                                                fillColorHex = circleFillColorHex,
-                                                fillAlphaText = circleFillAlphaText,
-                                                widthText = circleStrokeWidthText
-                                            )
+                                    DrawMode.Circle -> MKCircleOverlay(
+                                        id = id,
+                                        center = draftPoints.last(),
+                                        radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
+                                        style = buildCircleOverlayStyle(
+                                            strokeColorHex = circleStrokeColorHex,
+                                            fillColorHex = circleFillColorHex,
+                                            fillAlphaText = circleFillAlphaText,
+                                            widthText = circleStrokeWidthText
                                         )
+                                    )
 
-                                        else -> return@Button
-                                    }
-                                    draftPoints = emptyList()
+                                    else -> return@DraftGeometryActionRow
                                 }
-                            ) {
-                                Text("Confirm")
+                                draftPoints = emptyList()
                             }
-                        }
+                        )
                     }
                 }
 
@@ -436,7 +390,7 @@ internal fun DemoScreen() {
                 )
             }
 
-            DemoTab.Settings -> {
+            AppTab.Settings -> {
                 val poiFilterPreset = when (val f = options.poiFilter) {
                     MKPoiFilter.All -> PoiFilterPreset.all
                     MKPoiFilter.None -> PoiFilterPreset.none

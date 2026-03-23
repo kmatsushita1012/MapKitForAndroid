@@ -20,20 +20,21 @@ dependencyResolutionManagement {
 
 ### 2. 依存を追加
 
-Compose 利用時は `mapkit-android-compose` のみで利用できます。
+推奨は単一artifactです。
 
 ```kotlin
 dependencies {
-    implementation("io.github.kmatsushita1012:mapkit-android-compose:0.1.0")
+    implementation("io.github.kmatsushita1012:mapkit-android:0.1.0")
 }
 ```
 
-必要に応じて個別モジュールも追加できます。
+必要に応じて個別モジュールも選択できます。
 
 ```kotlin
 dependencies {
     implementation("io.github.kmatsushita1012:mapkit-android-core:0.1.0")
     implementation("io.github.kmatsushita1012:mapkit-android-webview:0.1.0")
+    implementation("io.github.kmatsushita1012:mapkit-android-compose:0.1.0")
 }
 ```
 
@@ -115,7 +116,8 @@ fun SampleMap() {
 
 ## モジュール構成
 
+- `source/mapkit-android`: 導入を簡単にする集約モジュール
 - `source/mapkit-android-core`: 公開モデル/初期化 API
 - `source/mapkit-android-webview`: WebView + MapKit JS bridge
 - `source/mapkit-android-compose`: Compose 向け API (`MKMapView`)
-- `example/example-app`: サンプルアプリ
+- `example/app`: サンプルアプリ

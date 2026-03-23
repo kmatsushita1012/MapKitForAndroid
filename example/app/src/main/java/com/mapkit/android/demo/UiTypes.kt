@@ -1,6 +1,6 @@
 package com.mapkit.android.demo
 
-internal enum class DemoTab { Map, Settings }
+internal enum class AppTab { Map, Settings }
 internal enum class DrawMode { Browse, Annotation, Polyline, Polygon, Circle }
 internal enum class PlacementTrigger { Tap, LongPress }
 internal enum class AnnotationVisualStyle { Default, CustomImage }
