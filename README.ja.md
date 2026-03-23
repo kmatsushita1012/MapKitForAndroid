@@ -5,7 +5,7 @@
 MapKit JS を Android `WebView` で扱うための Kotlin ライブラリです。  
 Compose から `MKMapView` を使って地図を表示し、Annotation / Overlay / Region / Option を Kotlin モデルで制御できます。
 
-## インストール (JitPack, 0.1.0)
+## インストール (JitPack, 0.1.1)
 
 ### 1. `settings.gradle.kts` に JitPack を追加
 
@@ -26,7 +26,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.github.kmatsushita1012:mapkit-android:0.1.0")
+    implementation("io.github.kmatsushita1012:mapkit-android:0.1.1")
 }
 ```
 
@@ -34,9 +34,9 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("io.github.kmatsushita1012:mapkit-android-core:0.1.0")
-    implementation("io.github.kmatsushita1012:mapkit-android-webview:0.1.0")
-    implementation("io.github.kmatsushita1012:mapkit-android-compose:0.1.0")
+    implementation("io.github.kmatsushita1012:mapkit-android-core:0.1.1")
+    implementation("io.github.kmatsushita1012:mapkit-android-webview:0.1.1")
+    implementation("io.github.kmatsushita1012:mapkit-android-compose:0.1.1")
 }
 ```
 
