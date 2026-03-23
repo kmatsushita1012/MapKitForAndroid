@@ -26,7 +26,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.github.kmatsushita1012:mapkit-android:0.1.1")
+    implementation("io.github.kmatsushita1012:mapkit-for-android:0.1.1")
 }
 ```
 

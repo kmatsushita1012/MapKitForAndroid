@@ -37,7 +37,7 @@ publishing {
     publications {
         register<MavenPublication>("release") {
             groupId = providers.gradleProperty("POM_GROUP_ID").get()
-            artifactId = "mapkit-android"
+            artifactId = "mapkit-for-android"
             version = providers.gradleProperty("VERSION_NAME").get()
 
             pom {
