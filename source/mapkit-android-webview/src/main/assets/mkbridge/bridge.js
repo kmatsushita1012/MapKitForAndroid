@@ -447,7 +447,7 @@
           title: item.title || item.id,
           subtitle: item.subtitle || undefined,
           url: { 1: imageUrl, 2: imageUrl, 3: imageUrl },
-          anchorOffset: new DOMPoint(0, -Math.round(h / 2)),
+          anchorOffset: new DOMPoint(0, 0),
         });
       } else {
         const options = {
