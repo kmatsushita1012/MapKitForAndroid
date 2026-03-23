@@ -150,6 +150,13 @@ private fun DemoScreen() {
     var polylineDashed by remember { mutableStateOf(false) }
     var polylineDashLengthText by remember { mutableStateOf("10") }
     var polylineGapLengthText by remember { mutableStateOf("6") }
+    var polygonConfigExpanded by remember { mutableStateOf(true) }
+    var polygonStrokeColorHex by remember { mutableStateOf("#22c55e") }
+    var polygonFillColorHex by remember { mutableStateOf("#22c55e33") }
+    var polygonStrokeWidthText by remember { mutableStateOf("3.0") }
+    var polygonDashed by remember { mutableStateOf(false) }
+    var polygonDashLengthText by remember { mutableStateOf("10") }
+    var polygonGapLengthText by remember { mutableStateOf("6") }
 
     val selectedTab = if (selectedTabIndex == 0) DemoTab.Map else DemoTab.Settings
 
@@ -177,10 +184,13 @@ private fun DemoScreen() {
                 MKPolygonOverlay(
                     id = "draft-polygon",
                     points = draftPoints,
-                    style = MKOverlayStyle(
-                        strokeColorHex = "#f97316",
-                        strokeWidth = 3.0,
-                        fillColorHex = "rgba(249, 115, 22, 0.22)"
+                    style = buildPolygonOverlayStyle(
+                        strokeColorHex = polygonStrokeColorHex,
+                        fillColorHex = polygonFillColorHex,
+                        widthText = polygonStrokeWidthText,
+                        dashed = polygonDashed,
+                        dashLengthText = polygonDashLengthText,
+                        gapLengthText = polygonGapLengthText
                     )
                 )
             )
@@ -316,10 +326,13 @@ private fun DemoScreen() {
                                         DrawMode.Polygon -> MKPolygonOverlay(
                                             id = id,
                                             points = draftPoints,
-                                            style = MKOverlayStyle(
-                                                strokeColorHex = "#22c55e",
-                                                strokeWidth = 3.0,
-                                                fillColorHex = "rgba(34, 197, 94, 0.2)"
+                                            style = buildPolygonOverlayStyle(
+                                                strokeColorHex = polygonStrokeColorHex,
+                                                fillColorHex = polygonFillColorHex,
+                                                widthText = polygonStrokeWidthText,
+                                                dashed = polygonDashed,
+                                                dashLengthText = polygonDashLengthText,
+                                                gapLengthText = polygonGapLengthText
                                             )
                                         )
 
@@ -545,6 +558,51 @@ private fun DemoScreen() {
                                 value = polylineGapLengthText,
                                 onValueChange = { polylineGapLengthText = it },
                                 label = { Text("Gap Length") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    ConfigSectionHeader(
+                        title = "Polygon Config",
+                        expanded = polygonConfigExpanded,
+                        onExpandedChange = { polygonConfigExpanded = it }
+                    )
+                    if (polygonConfigExpanded) {
+                        OutlinedTextField(
+                            value = polygonStrokeColorHex,
+                            onValueChange = { polygonStrokeColorHex = it },
+                            label = { Text("Polygon Stroke Color (hex)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = polygonFillColorHex,
+                            onValueChange = { polygonFillColorHex = it },
+                            label = { Text("Polygon Fill Color (hex/rgba)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = polygonStrokeWidthText,
+                            onValueChange = { polygonStrokeWidthText = it },
+                            label = { Text("Polygon Stroke Width") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        ToggleRow(
+                            label = "Polygon Dashed",
+                            checked = polygonDashed,
+                            onCheckedChange = { polygonDashed = it }
+                        )
+                        if (polygonDashed) {
+                            OutlinedTextField(
+                                value = polygonDashLengthText,
+                                onValueChange = { polygonDashLengthText = it },
+                                label = { Text("Polygon Dash Length") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = polygonGapLengthText,
+                                onValueChange = { polygonGapLengthText = it },
+                                label = { Text("Polygon Gap Length") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -823,6 +881,31 @@ private fun buildPolylineOverlayStyle(
     return MKOverlayStyle(
         strokeColorHex = colorHex.ifBlank { "#0ea5e9" },
         strokeWidth = width,
+        lineDashPattern = dashPattern
+    )
+}
+
+private fun buildPolygonOverlayStyle(
+    strokeColorHex: String,
+    fillColorHex: String,
+    widthText: String,
+    dashed: Boolean,
+    dashLengthText: String,
+    gapLengthText: String
+): MKOverlayStyle {
+    val width = parsePositiveDouble(widthText, fallback = 3.0)
+    val dashPattern = if (dashed) {
+        listOf(
+            parsePositiveDouble(dashLengthText, fallback = 10.0),
+            parsePositiveDouble(gapLengthText, fallback = 6.0)
+        )
+    } else {
+        null
+    }
+    return MKOverlayStyle(
+        strokeColorHex = strokeColorHex.ifBlank { "#22c55e" },
+        strokeWidth = width,
+        fillColorHex = fillColorHex.ifBlank { "#22c55e33" },
         lineDashPattern = dashPattern
     )
 }
