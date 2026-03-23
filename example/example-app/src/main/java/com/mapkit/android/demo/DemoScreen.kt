@@ -373,7 +373,7 @@ internal fun DemoScreen() {
                                                 null
                                             },
                                             glyphImageSource = if (markerGlyphMode == MarkerGlyphMode.GlyphImage) {
-                                                MKImageSource.Url("file:///android_asset/demo/custom-glyph.svg")
+                                                MKImageSource.Url("https://appassets.androidplatform.net/assets/demo/custom-glyph.svg")
                                             } else {
                                                 null
                                             }
@@ -664,7 +664,7 @@ internal fun DemoScreen() {
                                 )
                             } else {
                                 Text(
-                                    text = "Marker glyph image: file:///android_asset/demo/custom-glyph.svg",
+                                    text = "Marker glyph image: https://appassets.androidplatform.net/assets/demo/custom-glyph.svg",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }

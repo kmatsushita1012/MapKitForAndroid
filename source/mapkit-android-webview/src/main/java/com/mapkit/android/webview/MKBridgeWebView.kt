@@ -5,10 +5,13 @@ import android.content.Context
 import android.util.AttributeSet
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebViewAssetLoader
 import com.mapkit.android.model.MKCoordinate
 import com.mapkit.android.model.MKCoordinateRegion
 import com.mapkit.android.model.MKCircleOverlay
@@ -30,6 +33,9 @@ class MKBridgeWebView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : WebView(context, attrs) {
+    private val assetLoader = WebViewAssetLoader.Builder()
+        .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+        .build()
 
     private var onEvent: ((MKMapEvent) -> Unit)? = null
     private var isPageReady = false
@@ -59,7 +65,7 @@ class MKBridgeWebView @JvmOverloads constructor(
     init {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.allowFileAccess = true
+        settings.allowFileAccess = false
         settings.allowContentAccess = false
         settings.setSupportZoom(false)
         settings.builtInZoomControls = false
@@ -69,6 +75,13 @@ class MKBridgeWebView @JvmOverloads constructor(
         setOnLongClickListener { true }
         webChromeClient = WebChromeClient()
         webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 isPageReady = true
                 sendInitIfPossible()
@@ -76,7 +89,7 @@ class MKBridgeWebView @JvmOverloads constructor(
             }
         }
         addJavascriptInterface(androidBridge, "AndroidMKBridge")
-        loadUrl("file:///android_asset/mkbridge/index.html")
+        loadUrl("https://appassets.androidplatform.net/assets/mkbridge/index.html")
     }
 
     fun setEventListener(listener: (MKMapEvent) -> Unit) {
