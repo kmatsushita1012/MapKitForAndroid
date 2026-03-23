@@ -51,6 +51,7 @@ import com.mapkit.android.model.MKAnnotation
 import com.mapkit.android.model.MKAnnotationStyle
 import com.mapkit.android.model.MKAppearanceOption
 import com.mapkit.android.model.MKCameraZoomRange
+import com.mapkit.android.model.MKCircleOverlay
 import com.mapkit.android.model.MKCoordinate
 import com.mapkit.android.model.MKCoordinateRegion
 import com.mapkit.android.model.MKImageSource
@@ -70,7 +71,7 @@ import java.io.ByteArrayOutputStream
 import java.util.Locale
 
 private enum class DemoTab { Map, Settings }
-private enum class DrawMode { Browse, Annotation, Polyline, Polygon }
+private enum class DrawMode { Browse, Annotation, Polyline, Polygon, Circle }
 private enum class PlacementTrigger { Tap, LongPress }
 private enum class AnnotationVisualStyle { Default, CustomImage }
 private enum class MarkerGlyphMode { GlyphText, GlyphImage }
@@ -159,6 +160,12 @@ private fun DemoScreen() {
     var polygonDashed by remember { mutableStateOf(false) }
     var polygonDashLengthText by remember { mutableStateOf("10") }
     var polygonGapLengthText by remember { mutableStateOf("6") }
+    var circleConfigExpanded by remember { mutableStateOf(true) }
+    var circleStrokeColorHex by remember { mutableStateOf("#2563eb") }
+    var circleFillColorHex by remember { mutableStateOf("#2563eb") }
+    var circleFillAlphaText by remember { mutableStateOf("0.20") }
+    var circleStrokeWidthText by remember { mutableStateOf("3.0") }
+    var circleRadiusText by remember { mutableStateOf("120") }
 
     val selectedTab = if (selectedTabIndex == 0) DemoTab.Map else DemoTab.Settings
 
@@ -194,6 +201,24 @@ private fun DemoScreen() {
                         dashed = polygonDashed,
                         dashLengthText = polygonDashLengthText,
                         gapLengthText = polygonGapLengthText
+                    )
+                )
+            )
+        } else {
+            emptyList()
+        }
+
+        DrawMode.Circle -> if (draftPoints.isNotEmpty()) {
+            listOf(
+                MKCircleOverlay(
+                    id = "draft-circle",
+                    center = draftPoints.last(),
+                    radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
+                    style = buildCircleOverlayStyle(
+                        strokeColorHex = circleStrokeColorHex,
+                        fillColorHex = circleFillColorHex,
+                        fillAlphaText = circleFillAlphaText,
+                        widthText = circleStrokeWidthText
                     )
                 )
             )
@@ -289,7 +314,7 @@ private fun DemoScreen() {
                         }
                     }
 
-                    if (drawMode == DrawMode.Polyline || drawMode == DrawMode.Polygon) {
+                    if (drawMode == DrawMode.Polyline || drawMode == DrawMode.Polygon || drawMode == DrawMode.Circle) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -310,7 +335,8 @@ private fun DemoScreen() {
                             }
                             Button(
                                 enabled = (drawMode == DrawMode.Polyline && draftPoints.size >= 2) ||
-                                    (drawMode == DrawMode.Polygon && draftPoints.size >= 3),
+                                    (drawMode == DrawMode.Polygon && draftPoints.size >= 3) ||
+                                    (drawMode == DrawMode.Circle && draftPoints.isNotEmpty()),
                                 onClick = {
                                     val id = UUID.randomUUID().toString()
                                     committedOverlays = committedOverlays + when (drawMode) {
@@ -337,6 +363,18 @@ private fun DemoScreen() {
                                                 dashed = polygonDashed,
                                                 dashLengthText = polygonDashLengthText,
                                                 gapLengthText = polygonGapLengthText
+                                            )
+                                        )
+
+                                        DrawMode.Circle -> MKCircleOverlay(
+                                            id = id,
+                                            center = draftPoints.last(),
+                                            radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
+                                            style = buildCircleOverlayStyle(
+                                                strokeColorHex = circleStrokeColorHex,
+                                                fillColorHex = circleFillColorHex,
+                                                fillAlphaText = circleFillAlphaText,
+                                                widthText = circleStrokeWidthText
                                             )
                                         )
 
@@ -401,6 +439,9 @@ private fun DemoScreen() {
                                 DrawMode.Polyline,
                                 DrawMode.Polygon -> {
                                     draftPoints = draftPoints + coordinate
+                                }
+                                DrawMode.Circle -> {
+                                    draftPoints = listOf(coordinate)
                                 }
                             }
                         }
@@ -616,6 +657,44 @@ private fun DemoScreen() {
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                    }
+
+                    ConfigSectionHeader(
+                        title = "Circle Config",
+                        expanded = circleConfigExpanded,
+                        onExpandedChange = { circleConfigExpanded = it }
+                    )
+                    if (circleConfigExpanded) {
+                        OutlinedTextField(
+                            value = circleStrokeColorHex,
+                            onValueChange = { circleStrokeColorHex = it },
+                            label = { Text("Circle Stroke Color (hex)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = circleFillColorHex,
+                            onValueChange = { circleFillColorHex = it },
+                            label = { Text("Circle Fill Color (hex)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = circleFillAlphaText,
+                            onValueChange = { circleFillAlphaText = it },
+                            label = { Text("Circle Fill Alpha (0.0-1.0)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = circleStrokeWidthText,
+                            onValueChange = { circleStrokeWidthText = it },
+                            label = { Text("Circle Stroke Width") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = circleRadiusText,
+                            onValueChange = { circleRadiusText = it },
+                            label = { Text("Circle Radius (meter)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
                     ConfigSectionHeader(
@@ -921,6 +1000,22 @@ private fun buildPolygonOverlayStyle(
             alphaText = fillAlphaText
         ),
         lineDashPattern = dashPattern
+    )
+}
+
+private fun buildCircleOverlayStyle(
+    strokeColorHex: String,
+    fillColorHex: String,
+    fillAlphaText: String,
+    widthText: String
+): MKOverlayStyle {
+    return MKOverlayStyle(
+        strokeColorHex = strokeColorHex.ifBlank { "#2563eb" },
+        strokeWidth = parsePositiveDouble(widthText, fallback = 3.0),
+        fillColorHex = buildRgbaColor(
+            colorHex = fillColorHex.ifBlank { "#2563eb" },
+            alphaText = fillAlphaText
+        )
     )
 }
 
