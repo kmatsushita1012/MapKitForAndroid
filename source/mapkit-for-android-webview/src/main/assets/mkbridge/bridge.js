@@ -48,7 +48,6 @@
   }
 
   function debugLog(message) {
-    console.log("[MKBridge] " + String(message || ""));
   }
 
   function emitBridgeError(message) {

@@ -1,7 +1,6 @@
 package com.studiomk.mapkit.demo
 
 import android.Manifest
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -389,8 +388,6 @@ internal fun AppScreen() {
                                 }
                             }
                         }
-
-                        Log.d("MainActivity", "$event")
                         when (event) {
                             is MKMapEvent.RegionDidChange -> {
                                 if (event.settled) {
