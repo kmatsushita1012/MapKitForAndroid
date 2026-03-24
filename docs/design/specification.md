@@ -47,24 +47,25 @@
 ### 2.1 外部仕様(interface)
 
 #### 2.1.1 公開コンポーネント
-- `MapKitMapView(state: MapState, onEvent: (MapEvent) -> Unit, modifier: Modifier = Modifier)`
+- `MKMapView(state: MKMapState, onEvent: (MKMapEvent) -> Unit, modifier: Modifier = Modifier)`
 
 #### 2.1.2 公開データモデル
-- `MapState`
-- `region: CoordinateRegion`
-- `annotations: List<MapAnnotation>`
-- `overlays: List<MapOverlay>`
-- `options: MapOptions`
-- `interaction: MapInteraction`
+- `MKMapState`
+- `region: MKCoordinateRegion`
+- `annotations: List<MKAnnotation>`
+- `overlays: List<MKOverlay>`
+- `options: MKMapOptions`
 
 #### 2.1.3 公開イベント
-- `MapEvent.RegionWillChange`
-- `MapEvent.RegionDidChange`
-- `MapEvent.RegionDidChangeSettled`
-- `MapEvent.AnnotationTapped`
-- `MapEvent.OverlayTapped`
-- `MapEvent.MapLoaded`
-- `MapEvent.MapError`
+- `MKMapEvent.MapLoaded`
+- `MKMapEvent.MapError`
+- `MKMapEvent.RegionDidChange`
+- `MKMapEvent.MapTapped`
+- `MKMapEvent.LongPress`
+- `MKMapEvent.AnnotationTapped`
+- `MKMapEvent.AnnotationDeselected`
+- `MKMapEvent.OverlayTapped`
+- `MKMapEvent.UserLocationUpdated`
 
 #### 2.1.4 動作契約
 - `state` は差分適用される(全面再生成しない)。
@@ -79,11 +80,9 @@
 - Engine 層: WebView 上 MapKit JS
 
 #### 2.2.2 同期アルゴリズム
-- `desiredState`(Kotlin 意図) と `actualState`(Map 実状態) を分離。
-- 以下を満たすときのみ map へ反映:
-- `lastOperation == system`
-- `actual` と `desired` が許容誤差以上で異なる
-- interactive 中でない
+- 描画は `MKMapState` 差分で反映する。
+- 選択制御は `MKMapState.selectAnnotation/deselectAnnotation` の command channel で反映する。
+- command channel は state インスタンス寿命に依存しない共有チャネルを使い、dispatcher 未接続時は queue する。
 
 #### 2.2.3 エラー処理
 - JS 初期化失敗、token 不正、Bridge 変換失敗を `MapEvent.MapError` で返す。
@@ -143,7 +142,7 @@
 - `title: String?`
 - `subtitle: String?`
 - `isVisible: Boolean`
-- `isSelected: Boolean`
+- `isSelected: Boolean` (getter only)
 - `style: AnnotationStyle`
 
 #### 4.1.2 Overlay
@@ -163,7 +162,6 @@
 
 #### 4.1.4 イベント
 - `AnnotationTapped(id)`
-- `AnnotationSelected(id)`
 - `AnnotationDeselected(id)`
 - `OverlayTapped(id)`
 
@@ -171,8 +169,15 @@
 
 #### 4.2.1 差分反映
 - `id` 単位で `add/update/remove` を計算。
-- update 判定は `hash(style + geometry + visibility + selected)` で実施。
+- update 判定は `hash(style + geometry + visibility)` で実施。
+- `isSelected` は差分キーに含めない。選択状態は select/deselect event 起点で同期する。
 - map 再生成は禁止。差分命令のみ送信。
+
+#### 4.2.2 選択制御方針
+- Kotlin 側の明示制御は `MKMapState.selectAnnotation/deselectAnnotation` を使う。
+- JS 側の選択操作は `map.selectedAnnotation` の代入で行う。
+- `map.selectAnnotation/map.deselectAnnotation` は使用しない。
+- `isSelected` 更新と Kotlin 通知は `select` / `deselect` event listener のみで行う。
 
 #### 4.2.2 Renderer 解決
 - Annotation `style` ごとに renderer を選択:

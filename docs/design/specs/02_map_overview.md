@@ -34,7 +34,10 @@ data class MKMapState(
     val annotations: List<MKAnnotation> = emptyList(),
     val overlays: List<MKOverlay> = emptyList(),
     val options: MKMapOptions = MKMapOptions()
-)
+) {
+    fun selectAnnotation(annotationId: String, animated: Boolean = true)
+    fun deselectAnnotation(annotationId: String, animated: Boolean = false)
+}
 ```
 
 ### 3. 公開イベント
@@ -46,8 +49,11 @@ sealed interface MKMapEvent {
     data object MapLoaded : MKMapEvent
     data class MapError(val cause: MKMapErrorCause) : MKMapEvent
     data class RegionDidChange(val region: MKCoordinateRegion, val settled: Boolean) : MKMapEvent
-    data class AnnotationTapped(val id: String) : MKMapEvent
-    data class OverlayTapped(val id: String) : MKMapEvent
+    data class MapTapped(val coordinate: MKCoordinate) : MKMapEvent
+    data class LongPress(val coordinate: MKCoordinate) : MKMapEvent
+    data class AnnotationTapped(val annotation: MKAnnotation) : MKMapEvent
+    data class AnnotationDeselected(val annotation: MKAnnotation) : MKMapEvent
+    data class OverlayTapped(val overlay: MKOverlay) : MKMapEvent
     data class UserLocationUpdated(val coordinate: MKCoordinate) : MKMapEvent
 }
 
@@ -110,10 +116,11 @@ fun MapScreen() {
 - WebView はライブラリ同梱の中間 HTML/JS(ブリッジ JS) を読む。
 - 中間 JS が MapKit JS を初期化し、Kotlin <-> JS 双方向ブリッジを担当する。
 
-### 2. MapState 監視型反映(MapCommand 廃止)
+### 2. MapState 監視 + Command Channel 反映
 - Bridge は `MKMapState` の前回値/今回値を比較し、差分のみ JS に適用する。
 - 差分対象: region / annotations / overlays / options。
-- 利用者は `MKMapState` を更新するだけでよい。
+- 選択操作は `MKMapState.selectAnnotation/deselectAnnotation` で command を送る。
+- command は shared channel で保持し、dispatcher 未接続時に queue する。
 
 ### 3. 公開 `MKXXX` と内部モデルのブリッジ
 - 公開インターフェースは `MK` 接頭辞で統一する。

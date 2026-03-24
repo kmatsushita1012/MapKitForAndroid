@@ -7,15 +7,16 @@
 ```kotlin
 package com.studiomk.mapkit.model
 
-data class MKAnnotation(
-    val id: String,
-    val coordinate: MKCoordinate,
-    val title: String? = null,
-    val subtitle: String? = null,
-    val isVisible: Boolean = true,
-    val isSelected: Boolean = false,
-    val style: MKAnnotationStyle = MKAnnotationStyle.Default()
-)
+open class MKAnnotation(
+    open val id: String,
+    open val coordinate: MKCoordinate,
+    open val title: String? = null,
+    open val subtitle: String? = null,
+    open val isVisible: Boolean = true,
+    isSelected: Boolean = false
+) {
+    open val isSelected: Boolean
+}
 
 sealed interface MKImageSource {
     data class Url(val value: String) : MKImageSource
@@ -88,11 +89,10 @@ data class MKOverlayStyle(
 ### 3. 公開イベント
 
 ```kotlin
-sealed interface MKAnnotationOverlayEvent : MKMapEvent {
-    data class AnnotationTapped(val annotationId: String) : MKAnnotationOverlayEvent
-    data class AnnotationSelected(val annotationId: String) : MKAnnotationOverlayEvent
-    data class AnnotationDeselected(val annotationId: String) : MKAnnotationOverlayEvent
-    data class OverlayTapped(val overlayId: String) : MKAnnotationOverlayEvent
+sealed interface MKMapEvent {
+    data class AnnotationTapped(val annotation: MKAnnotation) : MKMapEvent
+    data class AnnotationDeselected(val annotation: MKAnnotation) : MKMapEvent
+    data class OverlayTapped(val overlay: MKOverlay) : MKMapEvent
 }
 ```
 
@@ -118,8 +118,15 @@ data class MKUserLocationOptions(
 
 ### 1. 差分更新
 - `id` を主キーとして `add/update/remove` を算出。
-- `update` は `geometry/style/visibility/selected` のいずれか変化時。
+- `update` は `geometry/style/visibility` のいずれか変化時。
+- `isSelected` 変化では annotation 再生成しない。
 - 全消し再描画は禁止。
+
+### 1.1 選択状態同期
+- `isSelected` は外部から直接変更しない(getter only)。
+- `isSelected` の更新は `select` / `deselect` event listener 起点のみで行う。
+- 明示選択制御は `MKMapState.selectAnnotation/deselectAnnotation` で行う。
+- JS 側の選択反映は `map.selectedAnnotation` を使用する。
 
 ### 2. 公開 `MKXXX` と内部モデルのブリッジ
 - Bridge で `MKAnnotation -> AnnotationModel`、`MKOverlay -> OverlayModel` に変換。
