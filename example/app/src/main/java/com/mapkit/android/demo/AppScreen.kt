@@ -194,7 +194,9 @@ internal fun AppScreen() {
         overlays = committedOverlays + draftOverlay,
         options = options
     )
-    val requestImmediateDeselect: (MKAnnotation) -> Unit = { _ -> }
+    val requestImmediateDeselect: (MKAnnotation) -> Unit = { annotation ->
+        mapState.deselectAnnotation(annotation)
+    }
     val requestExplicitDeselect: () -> Unit = { }
 
     val permissionLauncher = rememberLauncherForActivityResult(
