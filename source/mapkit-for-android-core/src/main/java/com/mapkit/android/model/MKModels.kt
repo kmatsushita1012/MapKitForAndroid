@@ -277,11 +277,9 @@ data class MKMapState(
     val overlays: List<MKOverlay> = emptyList(),
     val options: MKMapOptions = MKMapOptions()
 ) {
-    @Transient
-    private val pendingCommands = ArrayDeque<MKMapCommand>()
-
-    @Transient
-    private var commandDispatcher: ((MKMapCommand) -> Unit)? = null
+    companion object {
+        private val sharedCommandChannel = MKMapCommandChannel()
+    }
 
     @Synchronized
     fun selectAnnotation(annotation: MKAnnotation, animated: Boolean = true) {
@@ -307,15 +305,12 @@ data class MKMapState(
 
     @Synchronized
     fun bindCommandDispatcher(dispatcher: (MKMapCommand) -> Unit) {
-        commandDispatcher = dispatcher
-        while (pendingCommands.isNotEmpty()) {
-            dispatcher(pendingCommands.removeFirst())
-        }
+        sharedCommandChannel.bindDispatcher(dispatcher)
     }
 
     @Synchronized
     fun clearCommandDispatcher() {
-        commandDispatcher = null
+        sharedCommandChannel.clearDispatcher()
     }
 
     @Synchronized
@@ -341,9 +336,32 @@ data class MKMapState(
 
     @Synchronized
     private fun enqueueOrDispatch(command: MKMapCommand) {
-        val dispatcher = commandDispatcher
-        if (dispatcher != null) {
-            dispatcher(command)
+        sharedCommandChannel.dispatch(command)
+    }
+}
+
+class MKMapCommandChannel {
+    private val pendingCommands = ArrayDeque<MKMapCommand>()
+    private var dispatcher: ((MKMapCommand) -> Unit)? = null
+
+    @Synchronized
+    fun bindDispatcher(nextDispatcher: (MKMapCommand) -> Unit) {
+        dispatcher = nextDispatcher
+        while (pendingCommands.isNotEmpty()) {
+            nextDispatcher(pendingCommands.removeFirst())
+        }
+    }
+
+    @Synchronized
+    fun clearDispatcher() {
+        dispatcher = null
+    }
+
+    @Synchronized
+    fun dispatch(command: MKMapCommand) {
+        val currentDispatcher = dispatcher
+        if (currentDispatcher != null) {
+            currentDispatcher(command)
         } else {
             pendingCommands.addLast(command)
         }
