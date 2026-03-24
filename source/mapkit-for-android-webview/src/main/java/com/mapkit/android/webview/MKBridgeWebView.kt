@@ -197,6 +197,7 @@ class MKBridgeWebView @JvmOverloads constructor(
                         .put("title", annotation.title)
                         .put("subtitle", annotation.subtitle)
                         .put("isVisible", annotation.isVisible)
+                        .put("isSelected", annotation.isSelected)
                         .put("style", serializeAnnotationStyle(annotation.renderingStyle()))
                 )
             }
@@ -325,8 +326,11 @@ class MKBridgeWebView @JvmOverloads constructor(
 
             "annotationTapped" -> {
                 val id = json.getString("id")
-                val annotation = latestAnnotationsById[id]
+                val annotation = selectAnnotationById(id)
                 if (annotation != null) {
+                    // Force the next applyState after a tap even when the app immediately flips
+                    // selection back to false.
+                    lastAppliedPayload = null
                     MKMapEvent.AnnotationTapped(annotation)
                 } else {
                     MKMapEvent.MapError(
@@ -366,6 +370,14 @@ class MKBridgeWebView @JvmOverloads constructor(
                 MKMapErrorCause.BridgeFailure("Unknown event type: ${json.optString("type")}")
             )
         }
+    }
+
+    private fun selectAnnotationById(id: String): MKAnnotation? {
+        val target = latestAnnotationsById[id] ?: return null
+        latestAnnotationsById.values.forEach { annotation ->
+            annotation.isSelected = annotation.id == id
+        }
+        return target
     }
 
     private fun serializeAnnotationStyle(style: MKAnnotationStyle): JSONObject {

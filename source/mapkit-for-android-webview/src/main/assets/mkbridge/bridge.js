@@ -69,6 +69,13 @@
     return JSON.stringify(value);
   }
 
+  function stableAnnotationHash(item) {
+    if (!item || typeof item !== "object") return stableHash(item);
+    const normalized = Object.assign({}, item);
+    delete normalized.isSelected;
+    return stableHash(normalized);
+  }
+
   function mapTypeFor(style) {
     if (!window.mapkit || !window.mapkit.Map || !window.mapkit.Map.MapTypes) return null;
     const types = window.mapkit.Map.MapTypes;
@@ -401,8 +408,10 @@
     state.map.addEventListener("select", function (event) {
       try {
         if (event && event.annotation && event.annotation.data && event.annotation.data.id) {
-          debugLog("emit annotationTapped id=" + String(event.annotation.data.id));
-          emit({ type: "annotationTapped", id: String(event.annotation.data.id) });
+          const id = String(event.annotation.data.id);
+          markAnnotationSelectedInState(id);
+          debugLog("emit annotationTapped id=" + id);
+          emit({ type: "annotationTapped", id: id });
           return;
         }
         if (event && event.overlay && event.overlay.data && event.overlay.data.id) {
@@ -472,11 +481,36 @@
     annotation.data = { id: item.id };
     if (typeof annotation.addEventListener === "function") {
       annotation.addEventListener("select", function () {
+        markAnnotationSelectedInState(item.id);
         debugLog("emit annotationTapped(annotation.select) id=" + item.id);
         emit({ type: "annotationTapped", id: item.id });
       });
     }
     return annotation;
+  }
+
+  function markAnnotationSelectedInState(selectedId) {
+    (state.annotations || []).forEach((item) => {
+      if (!item || !item.id) return;
+      item.isSelected = item.id === selectedId;
+    });
+  }
+
+  function syncAnnotationSelection(annotation, isSelected) {
+    if (!state.map || !annotation) return;
+    try {
+      if (isSelected) {
+        if (typeof state.map.selectAnnotation === "function") {
+          state.map.selectAnnotation(annotation);
+        } else if ("selectedAnnotation" in state.map) {
+          state.map.selectedAnnotation = annotation;
+        }
+      } else if (typeof state.map.deselectAnnotation === "function") {
+        state.map.deselectAnnotation(annotation);
+      } else if ("selectedAnnotation" in state.map && state.map.selectedAnnotation === annotation) {
+        state.map.selectedAnnotation = null;
+      }
+    } catch (_) {}
   }
 
   function reconcileAnnotations(nextItems) {
@@ -498,9 +532,12 @@
     Object.keys(nextMap).forEach((id) => {
       const item = nextMap[id];
       if (item && item.isVisible === false) return;
-      const nextHash = stableHash(item);
+      const nextHash = stableAnnotationHash(item);
       const prevHash = state.annotationHashesById[id];
-      if (prevHash === nextHash && state.annotationsById[id]) return;
+      if (prevHash === nextHash && state.annotationsById[id]) {
+        syncAnnotationSelection(state.annotationsById[id], item.isSelected === true);
+        return;
+      }
 
       if (state.annotationsById[id]) {
         try {
@@ -510,6 +547,7 @@
       const marker = buildAnnotation(item);
       if (!marker) return;
       state.map.addAnnotation(marker);
+      syncAnnotationSelection(marker, item.isSelected === true);
       state.annotationsById[id] = marker;
       state.annotationHashesById[id] = nextHash;
     });
