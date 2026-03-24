@@ -69,6 +69,13 @@
     return JSON.stringify(value);
   }
 
+  function stableAnnotationHash(item) {
+    if (!item || typeof item !== "object") return stableHash(item);
+    const normalized = Object.assign({}, item);
+    delete normalized.isSelected;
+    return stableHash(normalized);
+  }
+
   function mapTypeFor(style) {
     if (!window.mapkit || !window.mapkit.Map || !window.mapkit.Map.MapTypes) return null;
     const types = window.mapkit.Map.MapTypes;
@@ -502,7 +509,7 @@
     Object.keys(nextMap).forEach((id) => {
       const item = nextMap[id];
       if (item && item.isVisible === false) return;
-      const nextHash = stableHash(item);
+      const nextHash = stableAnnotationHash(item);
       const prevHash = state.annotationHashesById[id];
       if (prevHash === nextHash && state.annotationsById[id]) return;
 
