@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Binder.flushPendingCommands
 import android.util.AttributeSet
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
@@ -148,8 +149,12 @@ class MKBridgeWebView @JvmOverloads constructor(
             return
         }
         when (command) {
-            is MKMapCommand.SelectAnnotation -> selectAnnotation(command.annotationId, command.animated)
-            is MKMapCommand.DeselectAnnotation -> deselectAnnotation(command.annotationId, command.animated)
+            is MKMapCommand.SelectAnnotation -> {
+                selectAnnotation(command.annotationId, command.animated)
+            }
+            is MKMapCommand.DeselectAnnotation -> {
+                deselectAnnotation(command.annotationId, command.animated)
+            }
         }
     }
 

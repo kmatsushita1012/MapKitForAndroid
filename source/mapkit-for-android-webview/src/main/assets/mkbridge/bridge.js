@@ -46,7 +46,7 @@
   }
 
   function debugLog(message) {
-    // no-op: library users should not receive bridge debug logs by default
+    console.log("[MKBridge] " + String(message || ""));
   }
 
   function emitBridgeError(message) {
@@ -833,6 +833,7 @@
       try {
         if ("selectedAnnotation" in state.map) {
           state.map.selectedAnnotation = annotation;
+          debugLog("selectAnnotationById: " + id);
         }
       } catch (_) {}
     },
@@ -844,6 +845,7 @@
       try {
         if ("selectedAnnotation" in state.map) {
           state.map.selectedAnnotation = null;
+          debugLog("deselectAnnotationById: " + id);
         }
       } catch (_) {}
     },
