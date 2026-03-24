@@ -81,7 +81,8 @@ open class MKAnnotation(
     open val coordinate: MKCoordinate,
     open val title: String? = null,
     open val subtitle: String? = null,
-    open val isVisible: Boolean = true
+    open val isVisible: Boolean = true,
+    open var isSelected: Boolean = false
 ) {
     open fun renderingStyle(): MKAnnotationStyle = MKAnnotationStyle.Marker()
 
@@ -99,6 +100,7 @@ open class MKAnnotation(
             title == other.title &&
             subtitle == other.subtitle &&
             isVisible == other.isVisible &&
+            isSelected == other.isSelected &&
             extraEquals(other)
     }
 
@@ -108,6 +110,7 @@ open class MKAnnotation(
         title,
         subtitle,
         isVisible,
+        isSelected,
         extraHashCode()
     ).hashCode()
 
@@ -120,6 +123,7 @@ class MKMarkerAnnotation(
     override val title: String? = null,
     override val subtitle: String? = null,
     override val isVisible: Boolean = true,
+    override var isSelected: Boolean = false,
     val tintHex: String = "#FF3B30",
     val glyphText: String? = null,
     val glyphImageSource: MKImageSource? = MKImageSource.ResourceName("pin")
@@ -128,7 +132,8 @@ class MKMarkerAnnotation(
     coordinate = coordinate,
     title = title,
     subtitle = subtitle,
-    isVisible = isVisible
+    isVisible = isVisible,
+    isSelected = isSelected
 ) {
     override fun renderingStyle(): MKAnnotationStyle = MKAnnotationStyle.Marker(
         tintHex = tintHex,

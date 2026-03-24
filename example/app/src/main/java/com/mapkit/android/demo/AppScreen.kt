@@ -90,6 +90,7 @@ internal fun AppScreen() {
 
     var tapAction by remember { mutableStateOf(DrawMode.None) }
     var longPressAction by remember { mutableStateOf(DrawMode.Annotation) }
+    var immediateDeselectOnAnnotationTap by remember { mutableStateOf(false) }
     var annotationVisualStyle by remember { mutableStateOf(AnnotationVisualStyle.Marker) }
     var annotationTitle by remember { mutableStateOf("Pinned") }
     var annotationSubtitle by remember { mutableStateOf("") }
@@ -380,6 +381,11 @@ internal fun AppScreen() {
                                     region = event.region
                                 }
                             }
+                            is MKMapEvent.AnnotationTapped -> {
+                                if (immediateDeselectOnAnnotationTap) {
+                                    event.annotation.isSelected = false
+                                }
+                            }
 
                             is MKMapEvent.LongPress -> {
                                 addGeometryPoint(longPressAction, event.coordinate)
@@ -491,6 +497,11 @@ internal fun AppScreen() {
                             value = longPressAction,
                             values = DrawMode.entries,
                             onSelected = { longPressAction = it }
+                        )
+                        ToggleRow(
+                            label = "Immediate Deselect on Annotation Tap",
+                            checked = immediateDeselectOnAnnotationTap,
+                            onCheckedChange = { immediateDeselectOnAnnotationTap = it }
                         )
 
                         ToggleRow(
