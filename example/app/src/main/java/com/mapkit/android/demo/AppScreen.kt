@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,24 +31,55 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.studiomk.mapkit.api.MKMapView
 import com.studiomk.mapkit.api.rememberMKMapController
-import com.studiomk.mapkit.model.MKAnnotation
 import com.studiomk.mapkit.model.MKAnnotationStyle
 import com.studiomk.mapkit.model.MKAppearanceOption
 import com.studiomk.mapkit.model.MKCameraZoomRange
-import com.studiomk.mapkit.model.MKCircleOverlay
 import com.studiomk.mapkit.model.MKCoordinate
 import com.studiomk.mapkit.model.MKCoordinateRegion
 import com.studiomk.mapkit.model.MKImageSource
-import com.studiomk.mapkit.model.MKMapEvent
 import com.studiomk.mapkit.model.MKMapLanguage
 import com.studiomk.mapkit.model.MKMapOptions
 import com.studiomk.mapkit.model.MKMapStyle
-import com.studiomk.mapkit.model.MKOverlay
+import com.studiomk.mapkit.model.MKOverlayStyle
 import com.studiomk.mapkit.model.MKPoiFilter
-import com.studiomk.mapkit.model.MKPolygonOverlay
-import com.studiomk.mapkit.model.MKPolylineOverlay
 import com.studiomk.mapkit.model.MKUserLocationOptions
 import java.util.UUID
+
+private data class Point(
+    val id: String,
+    val coordinate: MKCoordinate,
+    val title: String?,
+    val subtitle: String?,
+    val isVisible: Boolean = true,
+    val isDraggable: Boolean = true,
+    val style: MKAnnotationStyle
+)
+
+private data class Segment(
+    val id: String,
+    val points: List<MKCoordinate>,
+    val style: MKOverlayStyle,
+    val isVisible: Boolean = true,
+    val zIndex: Int = 0
+)
+
+private data class Area(
+    val id: String,
+    val points: List<MKCoordinate>,
+    val holes: List<List<MKCoordinate>> = emptyList(),
+    val style: MKOverlayStyle,
+    val isVisible: Boolean = true,
+    val zIndex: Int = 0
+)
+
+private data class CircleArea(
+    val id: String,
+    val center: MKCoordinate,
+    val radiusMeter: Double,
+    val style: MKOverlayStyle,
+    val isVisible: Boolean = true,
+    val zIndex: Int = 0
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,18 +95,23 @@ internal fun AppScreen() {
             )
         )
     }
-    var annotations by remember {
+    var pointEntities by remember {
         mutableStateOf(
             listOf(
-                MKAnnotation(
+                Point(
                     id = "tokyo-station",
                     coordinate = MKCoordinate(35.681236, 139.767125),
-                    title = "Tokyo Station"
+                    title = "Tokyo Station",
+                    subtitle = null,
+                    style = MKAnnotationStyle.Marker()
                 )
             )
         )
     }
-    var committedOverlays by remember { mutableStateOf<List<MKOverlay>>(emptyList()) }
+    var segmentEntities by remember { mutableStateOf<List<Segment>>(emptyList()) }
+    var areaEntities by remember { mutableStateOf<List<Area>>(emptyList()) }
+    var circleAreaEntities by remember { mutableStateOf<List<CircleArea>>(emptyList()) }
+
     var options by remember {
         mutableStateOf(
             MKMapOptions(
@@ -95,7 +132,6 @@ internal fun AppScreen() {
     var longPressAction by remember { mutableStateOf(DrawMode.Annotation) }
     var immediateDeselectOnAnnotationTap by remember { mutableStateOf(false) }
 
-    // Annotation config (新APIの style ベース)
     var annotationVisualStyle by remember { mutableStateOf(AnnotationVisualStyle.Marker) }
     var annotationTitle by remember { mutableStateOf("Pinned") }
     var annotationSubtitle by remember { mutableStateOf("") }
@@ -104,14 +140,12 @@ internal fun AppScreen() {
     var markerGlyphMode by remember { mutableStateOf(MarkerGlyphMode.GlyphText) }
     var customImageColorHex by remember { mutableStateOf("#f97316") }
 
-    // Section expansion
     var baseConfigExpanded by remember { mutableStateOf(false) }
     var annotationConfigExpanded by remember { mutableStateOf(false) }
     var polylineConfigExpanded by remember { mutableStateOf(false) }
     var polygonConfigExpanded by remember { mutableStateOf(false) }
     var circleConfigExpanded by remember { mutableStateOf(false) }
 
-    // Overlay style configs
     var polylineColorHex by remember { mutableStateOf("#0ea5e9") }
     var polylineWidthText by remember { mutableStateOf("4.0") }
     var polylineDashed by remember { mutableStateOf(false) }
@@ -134,64 +168,54 @@ internal fun AppScreen() {
 
     val selectedTab = if (selectedTabIndex == 0) AppTab.Map else AppTab.Settings
 
-    val draftOverlay = when (activeDrawMode) {
-        DrawMode.Polyline -> if (draftPoints.size >= 2) {
-            listOf(
-                MKPolylineOverlay(
-                    id = "draft-polyline",
-                    points = draftPoints,
-                    style = buildPolylineOverlayStyle(
-                        colorHex = polylineColorHex,
-                        widthText = polylineWidthText,
-                        dashed = polylineDashed,
-                        dashLengthText = polylineDashLengthText,
-                        gapLengthText = polylineGapLengthText
-                    )
-                )
+    val draftSegment = if (activeDrawMode == DrawMode.Polyline && draftPoints.size >= 2) {
+        Segment(
+            id = "draft-polyline",
+            points = draftPoints,
+            style = buildPolylineOverlayStyle(
+                colorHex = polylineColorHex,
+                widthText = polylineWidthText,
+                dashed = polylineDashed,
+                dashLengthText = polylineDashLengthText,
+                gapLengthText = polylineGapLengthText
             )
-        } else {
-            emptyList()
-        }
+        )
+    } else {
+        null
+    }
 
-        DrawMode.Polygon -> if (draftPoints.size >= 3) {
-            listOf(
-                MKPolygonOverlay(
-                    id = "draft-polygon",
-                    points = draftPoints,
-                    style = buildPolygonOverlayStyle(
-                        strokeColorHex = polygonStrokeColorHex,
-                        fillColorHex = polygonFillColorHex,
-                        fillAlphaText = polygonFillAlphaText,
-                        widthText = polygonStrokeWidthText,
-                        dashed = polygonDashed,
-                        dashLengthText = polygonDashLengthText,
-                        gapLengthText = polygonGapLengthText
-                    )
-                )
+    val draftArea = if (activeDrawMode == DrawMode.Polygon && draftPoints.size >= 3) {
+        Area(
+            id = "draft-polygon",
+            points = draftPoints,
+            style = buildPolygonOverlayStyle(
+                strokeColorHex = polygonStrokeColorHex,
+                fillColorHex = polygonFillColorHex,
+                fillAlphaText = polygonFillAlphaText,
+                widthText = polygonStrokeWidthText,
+                dashed = polygonDashed,
+                dashLengthText = polygonDashLengthText,
+                gapLengthText = polygonGapLengthText
             )
-        } else {
-            emptyList()
-        }
+        )
+    } else {
+        null
+    }
 
-        DrawMode.Circle -> if (draftPoints.isNotEmpty()) {
-            listOf(
-                MKCircleOverlay(
-                    id = "draft-circle",
-                    center = draftPoints.last(),
-                    radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
-                    style = buildCircleOverlayStyle(
-                        strokeColorHex = circleStrokeColorHex,
-                        fillColorHex = circleFillColorHex,
-                        fillAlphaText = circleFillAlphaText,
-                        widthText = circleStrokeWidthText
-                    )
-                )
+    val draftCircleArea = if (activeDrawMode == DrawMode.Circle && draftPoints.isNotEmpty()) {
+        CircleArea(
+            id = "draft-circle",
+            center = draftPoints.last(),
+            radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
+            style = buildCircleOverlayStyle(
+                strokeColorHex = circleStrokeColorHex,
+                fillColorHex = circleFillColorHex,
+                fillAlphaText = circleFillAlphaText,
+                widthText = circleStrokeWidthText
             )
-        } else {
-            emptyList()
-        }
-
-        else -> emptyList()
+        )
+    } else {
+        null
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -235,12 +259,11 @@ internal fun AppScreen() {
                         heightDp = 48
                     )
                 }
-                annotations = annotations + MKAnnotation(
+                pointEntities = pointEntities + Point(
                     id = UUID.randomUUID().toString(),
                     coordinate = coordinate,
                     title = normalizedTitle,
                     subtitle = annotationSubtitle.ifBlank { null },
-                    isDraggable = true,
                     style = style
                 )
             }
@@ -260,6 +283,10 @@ internal fun AppScreen() {
             }
         }
     }
+
+    val canConfirm = (activeDrawMode == DrawMode.Polyline && draftPoints.size >= 2) ||
+        (activeDrawMode == DrawMode.Polygon && draftPoints.size >= 3) ||
+        (activeDrawMode == DrawMode.Circle && draftPoints.isNotEmpty())
 
     Column(
         modifier = Modifier
@@ -301,70 +328,90 @@ internal fun AppScreen() {
                         values = DrawMode.entries,
                         onSelected = { tapAction = it }
                     )
-                    Button(
-                        onClick = { controller.deselectAnnotation(animated = false) },
-                        enabled = selectedAnnotationId != null
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Deselect Selected Annotation")
-                    }
-                    if (activeDrawMode == DrawMode.Polyline || activeDrawMode == DrawMode.Polygon || activeDrawMode == DrawMode.Circle) {
-                        DraftGeometryActionRow(
-                            drawMode = activeDrawMode,
-                            draftPointCount = draftPoints.size,
-                            onUndo = {
-                                if (draftPoints.isNotEmpty()) draftPoints = draftPoints.dropLast(1)
-                            },
-                            onClear = {
+                        Button(
+                            onClick = { controller.deselectAnnotation(animated = false) },
+                            enabled = selectedAnnotationId != null
+                        ) {
+                            Text("Deselect")
+                        }
+                        Button(
+                            onClick = { if (draftPoints.isNotEmpty()) draftPoints = draftPoints.dropLast(1) },
+                            enabled = draftPoints.isNotEmpty()
+                        ) {
+                            Text("Undo")
+                        }
+                        Button(
+                            onClick = {
                                 draftPoints = emptyList()
                                 activeDrawMode = DrawMode.None
                             },
-                            onConfirm = {
+                            enabled = draftPoints.isNotEmpty() || activeDrawMode != DrawMode.None
+                        ) {
+                            Text("Clear")
+                        }
+                        Button(
+                            onClick = {
                                 val id = UUID.randomUUID().toString()
-                                committedOverlays = committedOverlays + when (activeDrawMode) {
-                                    DrawMode.Polyline -> MKPolylineOverlay(
-                                        id = id,
-                                        points = draftPoints,
-                                        style = buildPolylineOverlayStyle(
-                                            colorHex = polylineColorHex,
-                                            widthText = polylineWidthText,
-                                            dashed = polylineDashed,
-                                            dashLengthText = polylineDashLengthText,
-                                            gapLengthText = polylineGapLengthText
+                                when (activeDrawMode) {
+                                    DrawMode.Polyline -> {
+                                        segmentEntities = segmentEntities + Segment(
+                                            id = id,
+                                            points = draftPoints,
+                                            style = buildPolylineOverlayStyle(
+                                                colorHex = polylineColorHex,
+                                                widthText = polylineWidthText,
+                                                dashed = polylineDashed,
+                                                dashLengthText = polylineDashLengthText,
+                                                gapLengthText = polylineGapLengthText
+                                            )
                                         )
-                                    )
+                                    }
 
-                                    DrawMode.Polygon -> MKPolygonOverlay(
-                                        id = id,
-                                        points = draftPoints,
-                                        style = buildPolygonOverlayStyle(
-                                            strokeColorHex = polygonStrokeColorHex,
-                                            fillColorHex = polygonFillColorHex,
-                                            fillAlphaText = polygonFillAlphaText,
-                                            widthText = polygonStrokeWidthText,
-                                            dashed = polygonDashed,
-                                            dashLengthText = polygonDashLengthText,
-                                            gapLengthText = polygonGapLengthText
+                                    DrawMode.Polygon -> {
+                                        areaEntities = areaEntities + Area(
+                                            id = id,
+                                            points = draftPoints,
+                                            style = buildPolygonOverlayStyle(
+                                                strokeColorHex = polygonStrokeColorHex,
+                                                fillColorHex = polygonFillColorHex,
+                                                fillAlphaText = polygonFillAlphaText,
+                                                widthText = polygonStrokeWidthText,
+                                                dashed = polygonDashed,
+                                                dashLengthText = polygonDashLengthText,
+                                                gapLengthText = polygonGapLengthText
+                                            )
                                         )
-                                    )
+                                    }
 
-                                    DrawMode.Circle -> MKCircleOverlay(
-                                        id = id,
-                                        center = draftPoints.last(),
-                                        radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
-                                        style = buildCircleOverlayStyle(
-                                            strokeColorHex = circleStrokeColorHex,
-                                            fillColorHex = circleFillColorHex,
-                                            fillAlphaText = circleFillAlphaText,
-                                            widthText = circleStrokeWidthText
+                                    DrawMode.Circle -> {
+                                        circleAreaEntities = circleAreaEntities + CircleArea(
+                                            id = id,
+                                            center = draftPoints.last(),
+                                            radiusMeter = parsePositiveDouble(circleRadiusText, fallback = 120.0),
+                                            style = buildCircleOverlayStyle(
+                                                strokeColorHex = circleStrokeColorHex,
+                                                fillColorHex = circleFillColorHex,
+                                                fillAlphaText = circleFillAlphaText,
+                                                widthText = circleStrokeWidthText
+                                            )
                                         )
-                                    )
+                                    }
 
-                                    else -> return@DraftGeometryActionRow
+                                    else -> Unit
                                 }
                                 draftPoints = emptyList()
                                 activeDrawMode = DrawMode.None
-                            }
-                        )
+                            },
+                            enabled = canConfirm
+                        ) {
+                            Text("Confirm")
+                        }
                     }
                 }
 
@@ -377,75 +424,118 @@ internal fun AppScreen() {
                         .weight(1f),
                     onRegionDidChange = { changed ->
                         region = changed
+                        val center = changed.center
+                        lastEventText =
+                            "RegionDidChange(center=${center.latitude.format6()},${center.longitude.format6()})"
                     },
-                    onEvent = { event ->
-                        lastEventText = event.toDisplayText()
-                        when (event) {
-                            is MKMapEvent.MapTapped -> addGeometryPoint(tapAction, event.coordinate)
-                            is MKMapEvent.LongPress -> addGeometryPoint(longPressAction, event.coordinate)
-                            else -> Unit
-                        }
+                    onMapTapped = { coordinate ->
+                        addGeometryPoint(tapAction, coordinate)
+                        lastEventText =
+                            "MapTapped(${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
+                    },
+                    onLongPress = { coordinate ->
+                        addGeometryPoint(longPressAction, coordinate)
+                        lastEventText =
+                            "LongPress(${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
+                    },
+                    onMapLoaded = {
+                        lastEventText = "MapLoaded"
+                    },
+                    onMapError = { cause ->
+                        lastEventText = "MapError: $cause"
                     }
                 ) {
-                    (annotations).forEach { annotation ->
-                        Annotation(
-                            id = annotation.id,
-                            coordinate = annotation.coordinate,
-                            title = annotation.title,
-                            subtitle = annotation.subtitle,
-                            isVisible = annotation.isVisible,
-                            isDraggable = annotation.isDraggable,
-                            style = annotation.style,
+                    pointEntities.forEach { point ->
+                        MKAnnotation(
+                            id = point.id,
+                            coordinate = point.coordinate,
+                            title = point.title,
+                            subtitle = point.subtitle,
+                            isVisible = point.isVisible,
+                            isDraggable = point.isDraggable,
+                            style = point.style,
                             onSelected = {
-                                selectedAnnotationId = annotation.id
+                                selectedAnnotationId = point.id
+                                lastEventText = "AnnotationSelected(id=${point.id})"
                                 if (immediateDeselectOnAnnotationTap) {
                                     controller.deselectAnnotation(animated = false)
                                 }
                             },
                             onDeselected = {
-                                if (selectedAnnotationId == annotation.id) {
+                                if (selectedAnnotationId == point.id) {
                                     selectedAnnotationId = null
                                 }
+                                lastEventText = "AnnotationDeselected(id=${point.id})"
                             },
                             onDrag = { nextCoordinate ->
-                                annotations = annotations.map {
-                                    if (it.id == annotation.id) it.copy(coordinate = nextCoordinate) else it
+                                pointEntities = pointEntities.map {
+                                    if (it.id == point.id) it.copy(coordinate = nextCoordinate) else it
                                 }
                             }
                         )
                     }
 
-                    (committedOverlays + draftOverlay).forEach { overlay ->
-                        when (overlay) {
-                            is MKPolylineOverlay -> PolylineOverlay(
-                                id = overlay.id,
-                                points = overlay.points,
-                                style = overlay.style,
-                                isVisible = overlay.isVisible,
-                                zIndex = overlay.zIndex,
-                                onTap = { lastEventText = "OverlayTapped(id=${overlay.id})" }
-                            )
+                    segmentEntities.forEach { segment ->
+                        MKPolylineOverlay(
+                            id = segment.id,
+                            points = segment.points,
+                            style = segment.style,
+                            isVisible = segment.isVisible,
+                            zIndex = segment.zIndex,
+                            onTap = { lastEventText = "OverlayTapped(id=${segment.id})" }
+                        )
+                    }
+                    areaEntities.forEach { area ->
+                        MKPolygonOverlay(
+                            id = area.id,
+                            points = area.points,
+                            holes = area.holes,
+                            style = area.style,
+                            isVisible = area.isVisible,
+                            zIndex = area.zIndex,
+                            onTap = { lastEventText = "OverlayTapped(id=${area.id})" }
+                        )
+                    }
+                    circleAreaEntities.forEach { circleArea ->
+                        MKCircleOverlay(
+                            id = circleArea.id,
+                            center = circleArea.center,
+                            radiusMeter = circleArea.radiusMeter,
+                            style = circleArea.style,
+                            isVisible = circleArea.isVisible,
+                            zIndex = circleArea.zIndex,
+                            onTap = { lastEventText = "OverlayTapped(id=${circleArea.id})" }
+                        )
+                    }
 
-                            is MKPolygonOverlay -> PolygonOverlay(
-                                id = overlay.id,
-                                points = overlay.points,
-                                holes = overlay.holes,
-                                style = overlay.style,
-                                isVisible = overlay.isVisible,
-                                zIndex = overlay.zIndex,
-                                onTap = { lastEventText = "OverlayTapped(id=${overlay.id})" }
-                            )
-
-                            is MKCircleOverlay -> CircleOverlay(
-                                id = overlay.id,
-                                center = overlay.center,
-                                radiusMeter = overlay.radiusMeter,
-                                style = overlay.style,
-                                isVisible = overlay.isVisible,
-                                zIndex = overlay.zIndex,
-                                onTap = { lastEventText = "OverlayTapped(id=${overlay.id})" }
-                            )
-                        }
+                    draftSegment?.let { segment ->
+                        MKPolylineOverlay(
+                            id = segment.id,
+                            points = segment.points,
+                            style = segment.style,
+                            isVisible = segment.isVisible,
+                            zIndex = segment.zIndex
+                        )
+                    }
+                    draftArea?.let { area ->
+                        MKPolygonOverlay(
+                            id = area.id,
+                            points = area.points,
+                            holes = area.holes,
+                            style = area.style,
+                            isVisible = area.isVisible,
+                            zIndex = area.zIndex
+                        )
+                    }
+                    draftCircleArea?.let { circleArea ->
+                        MKCircleOverlay(
+                            id = circleArea.id,
+                            center = circleArea.center,
+                            radiusMeter = circleArea.radiusMeter,
+                            style = circleArea.style,
+                            isVisible = circleArea.isVisible,
+                            zIndex = circleArea.zIndex
+                        )
                     }
                 }
             }
@@ -521,10 +611,12 @@ internal fun AppScreen() {
                             }
                         )
                         EnumSelector(
-                            label = "Zoom Range",
+                            label = "Zoom Range (Deprecated)",
                             value = zoomRangePreset,
                             values = ZoomRangePreset.entries,
                             onSelected = { preset ->
+                                // NOTE: MapKit JS側挙動差により、ズーム制約更新時に中心が移動する場合がある。
+                                // そのため現状は非推奨。必要時のみ利用し、違和感があれば none に戻す。
                                 options = options.copy(
                                     cameraZoomRange = when (preset) {
                                         ZoomRangePreset.none -> null
@@ -733,40 +825,6 @@ internal fun AppScreen() {
                     }
                 }
             }
-        }
-    }
-}
-
-private fun MKMapEvent.toDisplayText(): String {
-    return when (this) {
-        is MKMapEvent.MapLoaded -> "MapLoaded"
-        is MKMapEvent.MapError -> "MapError: $cause"
-        is MKMapEvent.MapTapped -> "MapTapped(${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
-        is MKMapEvent.RegionWillChange -> {
-            val center = region.center
-            "RegionWillChange(center=${center.latitude.format6()},${center.longitude.format6()})"
-        }
-        is MKMapEvent.RegionDidChange -> {
-            val center = region.center
-            "RegionDidChange(center=${center.latitude.format6()},${center.longitude.format6()})"
-        }
-
-        is MKMapEvent.LongPress -> "LongPress(${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
-        is MKMapEvent.AnnotationTapped -> "AnnotationTapped(id=$id)"
-        is MKMapEvent.AnnotationSelected -> "AnnotationSelected(id=$id)"
-        is MKMapEvent.AnnotationDeselected -> "AnnotationDeselected(id=$id)"
-        is MKMapEvent.AnnotationDragStart -> "AnnotationDragStart(id=$id)"
-        is MKMapEvent.AnnotationDragging -> {
-            "AnnotationDragging(id=$id,${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
-        }
-
-        is MKMapEvent.AnnotationDragEnd -> {
-            "AnnotationDragEnd(id=$id,${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
-        }
-
-        is MKMapEvent.OverlayTapped -> "OverlayTapped(id=$id)"
-        is MKMapEvent.UserLocationUpdated -> {
-            "UserLocationUpdated(${coordinate.latitude.format6()},${coordinate.longitude.format6()})"
         }
     }
 }
