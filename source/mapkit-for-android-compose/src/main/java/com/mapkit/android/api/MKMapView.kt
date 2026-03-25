@@ -219,6 +219,7 @@ fun MKMapView(
     options: MKMapOptions = MKMapOptions(),
     modifier: Modifier = Modifier,
     onRegionDidChange: ((MKCoordinateRegion) -> Unit)? = null,
+    onEvent: (MKMapEvent) -> Unit = {},
     content: MKMapContentScope.() -> Unit
 ) {
     val collected = MKMapContentCollector().collect(content)
@@ -232,6 +233,7 @@ fun MKMapView(
     val latestAnnotationCallbacks = rememberUpdatedState(collected.annotationCallbacksById)
     val latestOverlayCallbacks = rememberUpdatedState(collected.overlayCallbacksById)
     val latestOnRegionDidChange = rememberUpdatedState(onRegionDidChange)
+    val latestOnEvent = rememberUpdatedState(onEvent)
 
     AndroidView(
         modifier = modifier,
@@ -260,6 +262,7 @@ fun MKMapView(
                         }
                         else -> Unit
                     }
+                    latestOnEvent.value(event)
                 }
                 controller.bindCommandDispatcher { command -> webView.applyCommand(command) }
                 val token = MKMapKit.currentTokenOrNull()
@@ -293,6 +296,7 @@ fun MKMapView(
                     }
                     else -> Unit
                 }
+                latestOnEvent.value(event)
             }
             controller.bindCommandDispatcher { command -> webView.applyCommand(command) }
             val token = MKMapKit.currentTokenOrNull()
