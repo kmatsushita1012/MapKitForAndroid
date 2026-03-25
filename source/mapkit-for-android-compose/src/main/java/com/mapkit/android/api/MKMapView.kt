@@ -11,6 +11,7 @@ import com.studiomk.mapkit.model.MKAnnotationStyle
 import com.studiomk.mapkit.model.MKCircleOverlay
 import com.studiomk.mapkit.model.MKCoordinate
 import com.studiomk.mapkit.model.MKCoordinateRegion
+import com.studiomk.mapkit.model.MKMapErrorCause
 import com.studiomk.mapkit.model.MKMapEvent
 import com.studiomk.mapkit.model.MKMapOptions
 import com.studiomk.mapkit.model.MKMapRenderState
@@ -19,6 +20,10 @@ import com.studiomk.mapkit.model.MKOverlay
 import com.studiomk.mapkit.model.MKOverlayStyle
 import com.studiomk.mapkit.model.MKPolygonOverlay
 import com.studiomk.mapkit.model.MKPolylineOverlay
+import com.studiomk.mapkit.model.MKAnnotation as MKAnnotationModel
+import com.studiomk.mapkit.model.MKCircleOverlay as MKCircleOverlayModel
+import com.studiomk.mapkit.model.MKPolygonOverlay as MKPolygonOverlayModel
+import com.studiomk.mapkit.model.MKPolylineOverlay as MKPolylineOverlayModel
 import com.studiomk.mapkit.webview.MKBridgeWebView
 
 @DslMarker
@@ -49,7 +54,7 @@ internal data class MKCollectedContent(
 
 @MKMapDsl
 interface MKMapContentScope {
-    fun Annotation(
+    fun MKAnnotation(
         id: String,
         coordinate: MKCoordinate,
         title: String? = null,
@@ -64,7 +69,7 @@ interface MKMapContentScope {
         onDragEnd: ((MKCoordinate) -> Unit)? = null
     )
 
-    fun PolylineOverlay(
+    fun MKPolylineOverlay(
         id: String,
         points: List<MKCoordinate>,
         style: MKOverlayStyle = MKOverlayStyle(),
@@ -73,7 +78,7 @@ interface MKMapContentScope {
         onTap: (() -> Unit)? = null
     )
 
-    fun PolygonOverlay(
+    fun MKPolygonOverlay(
         id: String,
         points: List<MKCoordinate>,
         holes: List<List<MKCoordinate>> = emptyList(),
@@ -83,7 +88,7 @@ interface MKMapContentScope {
         onTap: (() -> Unit)? = null
     )
 
-    fun CircleOverlay(
+    fun MKCircleOverlay(
         id: String,
         center: MKCoordinate,
         radiusMeter: Double,
@@ -100,7 +105,7 @@ private class MKMapContentCollector : MKMapContentScope {
     private val annotationCallbacksById = linkedMapOf<String, MKAnnotationCallbacks>()
     private val overlayCallbacksById = linkedMapOf<String, MKOverlayCallbacks>()
 
-    override fun Annotation(
+    override fun MKAnnotation(
         id: String,
         coordinate: MKCoordinate,
         title: String?,
@@ -115,7 +120,7 @@ private class MKMapContentCollector : MKMapContentScope {
         onDragEnd: ((MKCoordinate) -> Unit)?
     ) {
         registerUniqueId(id)
-        annotations += MKAnnotation(
+        annotations += MKAnnotationModel(
             id = id,
             coordinate = coordinate,
             title = title,
@@ -133,7 +138,7 @@ private class MKMapContentCollector : MKMapContentScope {
         )
     }
 
-    override fun PolylineOverlay(
+    override fun MKPolylineOverlay(
         id: String,
         points: List<MKCoordinate>,
         style: MKOverlayStyle,
@@ -142,7 +147,7 @@ private class MKMapContentCollector : MKMapContentScope {
         onTap: (() -> Unit)?
     ) {
         registerUniqueId(id)
-        overlays += MKPolylineOverlay(
+        overlays += MKPolylineOverlayModel(
             id = id,
             points = points,
             style = style,
@@ -152,7 +157,7 @@ private class MKMapContentCollector : MKMapContentScope {
         overlayCallbacksById[id] = MKOverlayCallbacks(onTap = onTap)
     }
 
-    override fun PolygonOverlay(
+    override fun MKPolygonOverlay(
         id: String,
         points: List<MKCoordinate>,
         holes: List<List<MKCoordinate>>,
@@ -162,7 +167,7 @@ private class MKMapContentCollector : MKMapContentScope {
         onTap: (() -> Unit)?
     ) {
         registerUniqueId(id)
-        overlays += MKPolygonOverlay(
+        overlays += MKPolygonOverlayModel(
             id = id,
             points = points,
             holes = holes,
@@ -173,7 +178,7 @@ private class MKMapContentCollector : MKMapContentScope {
         overlayCallbacksById[id] = MKOverlayCallbacks(onTap = onTap)
     }
 
-    override fun CircleOverlay(
+    override fun MKCircleOverlay(
         id: String,
         center: MKCoordinate,
         radiusMeter: Double,
@@ -183,7 +188,7 @@ private class MKMapContentCollector : MKMapContentScope {
         onTap: (() -> Unit)?
     ) {
         registerUniqueId(id)
-        overlays += MKCircleOverlay(
+        overlays += MKCircleOverlayModel(
             id = id,
             center = center,
             radiusMeter = radiusMeter,
@@ -218,8 +223,13 @@ fun MKMapView(
     controller: MKMapController,
     options: MKMapOptions = MKMapOptions(),
     modifier: Modifier = Modifier,
+    onRegionWillChange: ((MKCoordinateRegion) -> Unit)? = null,
     onRegionDidChange: ((MKCoordinateRegion) -> Unit)? = null,
-    onEvent: (MKMapEvent) -> Unit = {},
+    onMapTapped: ((MKCoordinate) -> Unit)? = null,
+    onLongPress: ((MKCoordinate) -> Unit)? = null,
+    onMapLoaded: (() -> Unit)? = null,
+    onMapError: ((MKMapErrorCause) -> Unit)? = null,
+    onUserLocationUpdated: ((MKCoordinate) -> Unit)? = null,
     content: MKMapContentScope.() -> Unit
 ) {
     val collected = MKMapContentCollector().collect(content)
@@ -232,8 +242,13 @@ fun MKMapView(
 
     val latestAnnotationCallbacks = rememberUpdatedState(collected.annotationCallbacksById)
     val latestOverlayCallbacks = rememberUpdatedState(collected.overlayCallbacksById)
+    val latestOnRegionWillChange = rememberUpdatedState(onRegionWillChange)
     val latestOnRegionDidChange = rememberUpdatedState(onRegionDidChange)
-    val latestOnEvent = rememberUpdatedState(onEvent)
+    val latestOnMapTapped = rememberUpdatedState(onMapTapped)
+    val latestOnLongPress = rememberUpdatedState(onLongPress)
+    val latestOnMapLoaded = rememberUpdatedState(onMapLoaded)
+    val latestOnMapError = rememberUpdatedState(onMapError)
+    val latestOnUserLocationUpdated = rememberUpdatedState(onUserLocationUpdated)
 
     AndroidView(
         modifier = modifier,
@@ -241,7 +256,14 @@ fun MKMapView(
             MKBridgeWebView(context).also { webView ->
                 webView.setEventListener { event ->
                     when (event) {
+                        is MKMapEvent.MapLoaded -> latestOnMapLoaded.value?.invoke()
+                        is MKMapEvent.MapError -> latestOnMapError.value?.invoke(event.cause)
+                        is MKMapEvent.RegionWillChange -> latestOnRegionWillChange.value?.invoke(event.region)
                         is MKMapEvent.RegionDidChange -> latestOnRegionDidChange.value?.invoke(event.region)
+                        is MKMapEvent.MapTapped -> latestOnMapTapped.value?.invoke(event.coordinate)
+                        is MKMapEvent.LongPress -> latestOnLongPress.value?.invoke(event.coordinate)
+                        is MKMapEvent.UserLocationUpdated -> latestOnUserLocationUpdated.value?.invoke(event.coordinate)
+
                         is MKMapEvent.AnnotationSelected -> {
                             latestAnnotationCallbacks.value[event.id]?.onSelected?.invoke()
                         }
@@ -262,20 +284,28 @@ fun MKMapView(
                         }
                         else -> Unit
                     }
-                    latestOnEvent.value(event)
                 }
                 controller.bindCommandDispatcher { command -> webView.applyCommand(command) }
                 val token = MKMapKit.currentTokenOrNull()
                 if (token != null) {
                     webView.ensureInitialized(token)
                     webView.applyState(renderState)
+                } else {
+                    latestOnMapError.value?.invoke(MKMapErrorCause.TokenUnavailable)
                 }
             }
         },
         update = { webView ->
             webView.setEventListener { event ->
                 when (event) {
+                    is MKMapEvent.MapLoaded -> latestOnMapLoaded.value?.invoke()
+                    is MKMapEvent.MapError -> latestOnMapError.value?.invoke(event.cause)
+                    is MKMapEvent.RegionWillChange -> latestOnRegionWillChange.value?.invoke(event.region)
                     is MKMapEvent.RegionDidChange -> latestOnRegionDidChange.value?.invoke(event.region)
+                    is MKMapEvent.MapTapped -> latestOnMapTapped.value?.invoke(event.coordinate)
+                    is MKMapEvent.LongPress -> latestOnLongPress.value?.invoke(event.coordinate)
+                    is MKMapEvent.UserLocationUpdated -> latestOnUserLocationUpdated.value?.invoke(event.coordinate)
+
                     is MKMapEvent.AnnotationSelected -> {
                         latestAnnotationCallbacks.value[event.id]?.onSelected?.invoke()
                     }
@@ -296,13 +326,14 @@ fun MKMapView(
                     }
                     else -> Unit
                 }
-                latestOnEvent.value(event)
             }
             controller.bindCommandDispatcher { command -> webView.applyCommand(command) }
             val token = MKMapKit.currentTokenOrNull()
             if (token != null) {
                 webView.ensureInitialized(token)
                 webView.applyState(renderState)
+            } else {
+                latestOnMapError.value?.invoke(MKMapErrorCause.TokenUnavailable)
             }
         }
     )

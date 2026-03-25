@@ -176,8 +176,13 @@
     const categories = categoriesFromFilter(effectiveFilter);
 
     try {
+      const forceHideAll = type === "none" || (!defaultPoiVisible && type === "all");
+      if (typeof state.map.showsPointsOfInterest !== "undefined") {
+        state.map.showsPointsOfInterest = !forceHideAll;
+      }
+
       if (window.mapkit && window.mapkit.PointOfInterestFilter) {
-        if (type === "none" || (!defaultPoiVisible && type === "all")) {
+        if (forceHideAll) {
           if (typeof window.mapkit.PointOfInterestFilter.excludingAll === "function") {
             state.map.pointOfInterestFilter = window.mapkit.PointOfInterestFilter.excludingAll();
             return;
@@ -396,6 +401,21 @@
 
   function applyMapKitRegion(region) {
     if (!state.map || !window.mapkit || !region) return;
+    try {
+      const current = state.map.region;
+      if (current && current.center && current.span) {
+        const latEps = 1e-7;
+        const lngEps = 1e-7;
+        const spanEps = 1e-6;
+        const sameCenter =
+          Math.abs(current.center.latitude - region.centerLat) <= latEps &&
+          Math.abs(current.center.longitude - region.centerLng) <= lngEps;
+        const sameSpan =
+          Math.abs(current.span.latitudeDelta - region.latDelta) <= spanEps &&
+          Math.abs(current.span.longitudeDelta - region.lngDelta) <= spanEps;
+        if (sameCenter && sameSpan) return;
+      }
+    } catch (_) {}
     const center = new window.mapkit.Coordinate(region.centerLat, region.centerLng);
     const span = new window.mapkit.CoordinateSpan(region.latDelta, region.lngDelta);
     state.map.region = new window.mapkit.CoordinateRegion(center, span);
