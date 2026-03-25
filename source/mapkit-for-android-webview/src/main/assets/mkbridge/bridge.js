@@ -33,7 +33,6 @@
     annotationHashesById: {},
     overlayHashesById: {},
     lastSelectedAnnotationId: null,
-    pendingDeferredDeselect: null,
     longPressHandlersInstalled: false,
   };
 
@@ -834,20 +833,7 @@
       if (!state.map) return;
       try {
         if ("selectedAnnotation" in state.map) {
-          const selected = state.map.selectedAnnotation;
-          const selectedId = selected && selected.data && selected.data.id ? String(selected.data.id) : null;
-          const shouldDeferOneFrame = selectedId != null && state.lastSelectedAnnotationId === selectedId;
-          if (shouldDeferOneFrame && typeof requestAnimationFrame === "function") {
-            if (state.pendingDeferredDeselect != null && typeof cancelAnimationFrame === "function") {
-              cancelAnimationFrame(state.pendingDeferredDeselect);
-            }
-            state.pendingDeferredDeselect = requestAnimationFrame(function () {
-              state.pendingDeferredDeselect = null;
-              state.map.selectedAnnotation = null;
-            });
-          } else {
-            state.map.selectedAnnotation = null;
-          }
+          state.map.selectedAnnotation = null;
           debugLog("deselectAnnotation");
         }
       } catch (_) {}
