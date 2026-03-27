@@ -1,14 +1,14 @@
 
-WebViewAssetLoader でローカル HTML を https://master.d2p6lwu2ojgxks.amplifyapp.com/... に見せる最小例をそのまま出します。
+WebViewAssetLoader でローカル HTML を https://maps.example.com/... に見せる最小例をそのまま出します。
 
 前提はこれです。
 	•	Apple 側の Web domains に
-master.d2p6lwu2ojgxks.amplifyapp.com
+maps.example.com
 を登録
 	•	Android では 実ネットワークには行かず
 WebViewAssetLoader がローカル asset を返す
 	•	WebView では
-https://master.d2p6lwu2ojgxks.amplifyapp.com/assets/index.html
+https://maps.example.com/assets/index.html
 を開く
 
 ⸻
@@ -59,7 +59,7 @@ fun MapKitWebView(
         modifier = modifier,
         factory = { context ->
             val assetLoader = WebViewAssetLoader.Builder()
-                .setDomain("master.d2p6lwu2ojgxks.amplifyapp.com")
+                .setDomain("maps.example.com")
                 .addPathHandler(
                     "/assets/",
                     WebViewAssetLoader.AssetsPathHandler(context)
@@ -124,7 +124,7 @@ fun MapKitWebView(
                     }
                 }
 
-                loadUrl("https://master.d2p6lwu2ojgxks.amplifyapp.com/assets/index.html")
+                loadUrl("https://maps.example.com/assets/index.html")
             }
         }
     )
@@ -307,13 +307,13 @@ function createMap() {
 
 これが一致しているか。
 
-master.d2p6lwu2ojgxks.amplifyapp.com
+maps.example.com
 
 2. WebView が実際に開いている URL
 
 ログにこれが出るか。
 
-started: https://master.d2p6lwu2ojgxks.amplifyapp.com/assets/index.html
+started: https://maps.example.com/assets/index.html
 
 3. Console
 
@@ -345,7 +345,7 @@ mapkit.core.js だけでは足りない可能性
 
 file:// で開いていたらほぼ噛み合いませんが、今回のように
 
-https://master.d2p6lwu2ojgxks.amplifyapp.com/assets/index.html
+https://maps.example.com/assets/index.html
 
 で開けていればそこは揃います。
 
