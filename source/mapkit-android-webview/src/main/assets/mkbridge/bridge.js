@@ -17,7 +17,7 @@
     showsZoomControl: true,
     showsMapTypeControl: false,
     showsPointsOfInterest: true,
-    poiFilter: { type: "all", categories: [] },
+    poiFilter: { type: "MKPoiFilterAll", categories: [] },
     isRotateEnabled: true,
     isScrollEnabled: true,
     isZoomEnabled: true,
@@ -182,12 +182,16 @@
 
   function applyPoiFilter(filter, defaultPoiVisible) {
     if (!state.mapReady || !state.map) return;
-    const effectiveFilter = filter || { type: "all", categories: [] };
-    const type = (effectiveFilter.type || "all").toLowerCase();
+    const effectiveFilter = filter || { type: "MKPoiFilterAll", categories: [] };
+    const rawType = String(effectiveFilter.type || "MKPoiFilterAll");
+    const isAll = rawType === "MKPoiFilterAll" || rawType.toLowerCase() === "all";
+    const isNone = rawType === "MKPoiFilterNone" || rawType.toLowerCase() === "none";
+    const isInclude = rawType === "MKPoiFilterInclude" || rawType.toLowerCase() === "include";
+    const isExclude = rawType === "MKPoiFilterExclude" || rawType.toLowerCase() === "exclude";
     const categories = categoriesFromFilter(effectiveFilter);
 
     try {
-      const forceHideAll = type === "none" || (!defaultPoiVisible && type === "all");
+      const forceHideAll = isNone || (!defaultPoiVisible && isAll);
       if (typeof state.map.showsPointsOfInterest !== "undefined") {
         state.map.showsPointsOfInterest = !forceHideAll;
       }
@@ -200,21 +204,21 @@
           }
         }
 
-        if (type === "include" && categories.length > 0) {
+        if (isInclude && categories.length > 0) {
           if (typeof window.mapkit.PointOfInterestFilter.including === "function") {
             state.map.pointOfInterestFilter = window.mapkit.PointOfInterestFilter.including(categories);
             return;
           }
         }
 
-        if (type === "exclude" && categories.length > 0) {
+        if (isExclude && categories.length > 0) {
           if (typeof window.mapkit.PointOfInterestFilter.excluding === "function") {
             state.map.pointOfInterestFilter = window.mapkit.PointOfInterestFilter.excluding(categories);
             return;
           }
         }
 
-        if (type === "all" && window.mapkit.PointOfInterestFilter.includingAllCategories) {
+        if (isAll && window.mapkit.PointOfInterestFilter.includingAllCategories) {
           state.map.pointOfInterestFilter = window.mapkit.PointOfInterestFilter.includingAllCategories;
           return;
         }
@@ -425,9 +429,9 @@
 
   function resolveImageSource(source) {
     if (!source || !source.kind) return null;
-    if (source.kind === "url") return source.value || null;
-    if (source.kind === "base64Png") return "data:image/png;base64," + String(source.value || "");
-    if (source.kind === "resourceName") {
+    if (source.kind === "MKImageSourceUrl" || source.kind === "url") return source.value || null;
+    if (source.kind === "MKImageSourceBase64Png" || source.kind === "base64Png") return "data:image/png;base64," + String(source.value || "");
+    if (source.kind === "MKImageSourceResourceName" || source.kind === "resourceName") {
       return "file:///android_res/drawable/" + source.value + ".png";
     }
     return null;
@@ -465,10 +469,10 @@
 
   function buildAnnotation(item) {
     const coord = new window.mapkit.Coordinate(item.lat, item.lng);
-    const style = item.style || { kind: "default" };
+    const style = item.style || { kind: "MKAnnotationStyleMarker" };
     let annotation = null;
     try {
-      if (style.kind === "customImage" && window.mapkit.ImageAnnotation) {
+      if ((style.kind === "MKAnnotationStyleImage" || style.kind === "customImage") && window.mapkit.ImageAnnotation) {
         const imageUrl = resolveImageSource(style.source);
         annotation = new window.mapkit.ImageAnnotation(coord, {
           title: item.title || undefined,

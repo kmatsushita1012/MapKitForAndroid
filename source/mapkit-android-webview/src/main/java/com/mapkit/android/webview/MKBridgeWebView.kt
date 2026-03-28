@@ -311,9 +311,9 @@ class MKBridgeWebView @JvmOverloads constructor(
             state.overlays.forEach { overlay ->
                 val overlayJson = JSONObject()
                     .put("id", overlay.id)
-                    .put("type", overlay::class.simpleName)
                 when (overlay) {
                     is MKPolylineOverlay -> {
+                        overlayJson.put("type", "MKPolylineOverlay")
                         overlayJson.put(
                             "points",
                             JSONArray().apply {
@@ -328,6 +328,7 @@ class MKBridgeWebView @JvmOverloads constructor(
                             .put("lineDashPattern", overlay.style.lineDashPattern?.let { JSONArray(it) })
                     }
                     is MKPolygonOverlay -> {
+                        overlayJson.put("type", "MKPolygonOverlay")
                         overlayJson.put(
                             "points",
                             JSONArray().apply {
@@ -343,6 +344,7 @@ class MKBridgeWebView @JvmOverloads constructor(
                             .put("lineDashPattern", overlay.style.lineDashPattern?.let { JSONArray(it) })
                     }
                     is MKCircleOverlay -> {
+                        overlayJson.put("type", "MKCircleOverlay")
                         overlayJson
                             .put("centerLat", overlay.center.latitude)
                             .put("centerLng", overlay.center.longitude)
@@ -371,13 +373,13 @@ class MKBridgeWebView @JvmOverloads constructor(
             .put(
                 "poiFilter",
                 when (val filter = state.options.poiFilter) {
-                    MKPoiFilter.All -> JSONObject().put("type", "all")
-                    MKPoiFilter.None -> JSONObject().put("type", "none")
+                    MKPoiFilter.All -> JSONObject().put("type", "MKPoiFilterAll")
+                    MKPoiFilter.None -> JSONObject().put("type", "MKPoiFilterNone")
                     is MKPoiFilter.Include -> JSONObject()
-                        .put("type", "include")
+                        .put("type", "MKPoiFilterInclude")
                         .put("categories", JSONArray(filter.categories))
                     is MKPoiFilter.Exclude -> JSONObject()
-                        .put("type", "exclude")
+                        .put("type", "MKPoiFilterExclude")
                         .put("categories", JSONArray(filter.categories))
                 }
             )
@@ -470,7 +472,7 @@ class MKBridgeWebView @JvmOverloads constructor(
     private fun serializeAnnotationStyle(style: MKAnnotationStyle): JSONObject {
         return when (style) {
             is MKAnnotationStyle.Marker -> JSONObject()
-                .put("kind", "default")
+                .put("kind", "MKAnnotationStyleMarker")
                 .put("tintHex", style.tintHex)
                 .put("glyphText", style.glyphText)
                 .put(
@@ -479,7 +481,7 @@ class MKBridgeWebView @JvmOverloads constructor(
                 )
 
             is MKAnnotationStyle.Image -> JSONObject()
-                .put("kind", "customImage")
+                .put("kind", "MKAnnotationStyleImage")
                 .put("source", serializeImageSource(style.source))
                 .put("widthDp", style.widthDp)
                 .put("heightDp", style.heightDp)
@@ -491,15 +493,15 @@ class MKBridgeWebView @JvmOverloads constructor(
     private fun serializeImageSource(source: MKImageSource): JSONObject {
         return when (source) {
             is MKImageSource.Url -> JSONObject()
-                .put("kind", "url")
+                .put("kind", "MKImageSourceUrl")
                 .put("value", source.value)
 
             is MKImageSource.Base64Png -> JSONObject()
-                .put("kind", "base64Png")
+                .put("kind", "MKImageSourceBase64Png")
                 .put("value", source.value)
 
             is MKImageSource.ResourceName -> JSONObject()
-                .put("kind", "resourceName")
+                .put("kind", "MKImageSourceResourceName")
                 .put("value", source.value)
         }
     }
