@@ -433,6 +433,36 @@
     return null;
   }
 
+  function clamp01(value, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    if (n < 0) return 0;
+    if (n > 1) return 1;
+    return n;
+  }
+
+  function toPositiveNumber(value, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return fallback;
+    return n;
+  }
+
+  function createPoint(x, y) {
+    if (typeof DOMPoint !== "undefined") return new DOMPoint(x, y);
+    return { x: x, y: y };
+  }
+
+  function computeAnchorOffset(style) {
+    const width = toPositiveNumber(style && style.widthDp, 36);
+    const height = toPositiveNumber(style && style.heightDp, 36);
+    const anchorX = clamp01(style && style.anchorX, 0.5);
+    const anchorY = clamp01(style && style.anchorY, 1.0);
+    return createPoint(
+      (0.5 - anchorX) * width,
+      (0.5 - anchorY) * height
+    );
+  }
+
   function buildAnnotation(item) {
     const coord = new window.mapkit.Coordinate(item.lat, item.lng);
     const style = item.style || { kind: "default" };
@@ -440,12 +470,11 @@
     try {
       if (style.kind === "customImage" && window.mapkit.ImageAnnotation) {
         const imageUrl = resolveImageSource(style.source);
-        const h = Number(style.heightDp || 36);
         annotation = new window.mapkit.ImageAnnotation(coord, {
           title: item.title || undefined,
           subtitle: item.subtitle || undefined,
           url: { 1: imageUrl, 2: imageUrl, 3: imageUrl },
-          anchorOffset: new DOMPoint(0, 0),
+          anchorOffset: computeAnchorOffset(style),
         });
       } else {
         const options = {
