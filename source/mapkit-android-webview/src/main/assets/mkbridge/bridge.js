@@ -34,6 +34,7 @@
     overlayHashesById: {},
     lastSelectedAnnotationId: null,
     longPressHandlersInstalled: false,
+    suppressNextRegionWillChange: true,
   };
 
   function emit(payload) {
@@ -44,16 +45,6 @@
 
   function debugLog(message) {
     // keep silent in normal operation to avoid noisy console output
-  }
-
-  function debugWarn(message) {
-    try {
-      if (typeof console !== "undefined" && typeof console.warn === "function") {
-        console.warn("[MKBridge] " + String(message));
-      } else {
-        debugLog("WARN " + String(message));
-      }
-    } catch (_) {}
   }
 
   function debugError(message) {
@@ -326,24 +317,6 @@
 
   function attachMapEvents() {
     if (!state.map) return;
-    state.map.addEventListener("region-change-start", function () {
-      try {
-        const r = state.map.region;
-        if (r && r.center && r.span) {
-          state.region = {
-            centerLat: r.center.latitude,
-            centerLng: r.center.longitude,
-            latDelta: r.span.latitudeDelta,
-            lngDelta: r.span.longitudeDelta,
-          };
-          renderStatus();
-        }
-        emit({ type: "regionWillChange", region: state.region });
-      } catch (e) {
-        emitBridgeError(e && e.message ? e.message : e);
-      }
-    });
-
     state.map.addEventListener("region-change-end", function () {
       try {
         const r = state.map.region;
@@ -360,6 +333,29 @@
         emitBridgeError(e && e.message ? e.message : e);
       }
     });
+
+    state.map.addEventListener("region-change-start", function () {
+      const shouldEmit = !state.suppressNextRegionWillChange;
+      state.suppressNextRegionWillChange = false;
+      try {
+        const r = state.map.region;
+        if (r && r.center && r.span) {
+          state.region = {
+            centerLat: r.center.latitude,
+            centerLng: r.center.longitude,
+            latDelta: r.span.latitudeDelta,
+            lngDelta: r.span.longitudeDelta,
+          };
+          renderStatus();
+        }
+        if (shouldEmit) {
+          emit({ type: "regionWillChange", region: state.region });
+        }
+      } catch (e) {
+        emitBridgeError(e && e.message ? e.message : e);
+      }
+    });
+
 
     state.map.addEventListener("select", function (event) {
       try {
@@ -745,8 +741,11 @@
           emitBridgeError("MapKit map error: " + msg);
         });
 
-        attachMapEvents();
+        // Apply initial region before attaching listeners so bootstrap transitions
+        // (for example world -> target region) are not emitted to app callbacks.
+        applyMapKitRegion(state.region);
         state.mapReady = true;
+        attachMapEvents();
         applyMapOptions();
         debugLog("map instance created");
       });
