@@ -53,7 +53,8 @@ class MKBridgeWebView @JvmOverloads constructor(
     private var isPageReady = false
     private var isJsInitSent = false
     private var pendingToken: String? = null
-    private var lastAppliedPayload: String? = null
+    private var lastAppliedRegionPayload: String? = null
+    private var lastAppliedStatePayload: String? = null
     private var pendingState: MKMapRenderState? = null
     private val pendingCommands: MutableList<MKMapCommand> = mutableListOf()
 
@@ -169,7 +170,8 @@ class MKBridgeWebView @JvmOverloads constructor(
         assetLoader = buildAssetLoader(config)
         isPageReady = false
         isJsInitSent = false
-        lastAppliedPayload = null
+        lastAppliedRegionPayload = null
+        lastAppliedStatePayload = null
         loadUrl(entryUrl(config))
     }
 
@@ -212,10 +214,16 @@ class MKBridgeWebView @JvmOverloads constructor(
         val latest = pendingState ?: return
         if (!isPageReady || !isJsInitSent) return
 
-        val payload = serializeState(latest)
-        if (lastAppliedPayload == payload) return
-        evaluateJavascriptSafe("window.MKBridge && window.MKBridge.applyState($payload);")
-        lastAppliedPayload = payload
+        val regionPayload = serializeRegion(latest.region)
+        if (lastAppliedRegionPayload != regionPayload) {
+            evaluateJavascriptSafe("window.MKBridge && window.MKBridge.applyRegion && window.MKBridge.applyRegion($regionPayload);")
+            lastAppliedRegionPayload = regionPayload
+        }
+
+        val statePayload = serializeStateWithoutRegion(latest)
+        if (lastAppliedStatePayload == statePayload) return
+        evaluateJavascriptSafe("window.MKBridge && window.MKBridge.applyState($statePayload);")
+        lastAppliedStatePayload = statePayload
     }
 
     private fun sendInitIfPossible() {
@@ -284,12 +292,16 @@ class MKBridgeWebView @JvmOverloads constructor(
         return fine || coarse
     }
 
-    private fun serializeState(state: MKMapRenderState): String {
-        val regionJson = JSONObject()
-            .put("centerLat", state.region.center.latitude)
-            .put("centerLng", state.region.center.longitude)
-            .put("latDelta", state.region.span.latitudeDelta)
-            .put("lngDelta", state.region.span.longitudeDelta)
+    private fun serializeRegion(region: MKCoordinateRegion): String {
+        return JSONObject()
+            .put("centerLat", region.center.latitude)
+            .put("centerLng", region.center.longitude)
+            .put("latDelta", region.span.latitudeDelta)
+            .put("lngDelta", region.span.longitudeDelta)
+            .toString()
+    }
+
+    private fun serializeStateWithoutRegion(state: MKMapRenderState): String {
 
         val annotations = JSONArray().apply {
             state.annotations.forEach { annotation ->
@@ -361,7 +373,6 @@ class MKBridgeWebView @JvmOverloads constructor(
         }
 
         return JSONObject()
-            .put("region", regionJson)
             .put("annotations", annotations)
             .put("overlays", overlays)
             .put("mapStyle", state.options.mapStyle.name)

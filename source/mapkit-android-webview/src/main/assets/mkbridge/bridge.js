@@ -790,14 +790,24 @@
     }
   }
 
-  function applyStateToMap() {
+  function applyContentStateToMap() {
     if (!state.mapReady || !state.map) return;
-    applyMapKitRegion(state.region);
     applyMapOptions();
     reconcileAnnotations(state.annotations || []);
     reconcileOverlays(state.overlays || []);
     applyMapUserLocationConfig();
     renderStatus();
+  }
+
+  function applyRegionStateToMap() {
+    if (!state.mapReady || !state.map) return;
+    applyMapKitRegion(state.region);
+    renderStatus();
+  }
+
+  function applyStateToMap() {
+    applyRegionStateToMap();
+    applyContentStateToMap();
   }
 
   window.MKBridge = {
@@ -817,7 +827,6 @@
 
     applyState: function (payload) {
       debugLog("applyState called");
-      if (payload && payload.region) state.region = payload.region;
       if (payload && payload.annotations) state.annotations = payload.annotations;
       if (payload && payload.overlays) state.overlays = payload.overlays;
 
@@ -854,7 +863,16 @@
       }
 
       try {
-        applyStateToMap();
+        applyContentStateToMap();
+      } catch (e) {
+        emitBridgeError(e && e.message ? e.message : e);
+      }
+    },
+
+    applyRegion: function (region) {
+      if (region) state.region = region;
+      try {
+        applyRegionStateToMap();
       } catch (e) {
         emitBridgeError(e && e.message ? e.message : e);
       }
